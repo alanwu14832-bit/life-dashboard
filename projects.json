@@ -1,0 +1,71 @@
+{
+  "owner": "alanwu14832-bit",
+  "projects": [
+    {
+      "id": "bafinstat",
+      "name": "NTU BaFiN Stats",
+      "summary": "系棒數據平台",
+      "repo": "bafinstat",
+      "url": "https://bafinstat.vercel.app/",
+      "host": "vercel",
+      "supabase": "fedwjisnceioougzdgqk",
+      "notes": "https://app.notion.com/p/3d7cbee2351f81ccbc59c8cbec91ad65"
+    },
+    {
+      "id": "ntubastat",
+      "name": "NTUBT Stats",
+      "summary": "校隊數據平台",
+      "repo": "NTUBAstat",
+      "url": "https://ntubtstat.mbaw.workers.dev/",
+      "host": "cloudflare",
+      "supabase": "lsxetgadgliqkbyoskyl",
+      "notes": "https://app.notion.com/p/3f2cbee2351f813b958def05b9912504"
+    },
+    {
+      "id": "aloongstat",
+      "name": "台壽霸龍 Stats",
+      "summary": "成棒隊數據平台",
+      "repo": "aloongstat",
+      "url": "https://aloongstat.mbaw.workers.dev/",
+      "host": "cloudflare",
+      "supabase": "cnudkrfheffqktxwnaid"
+    },
+    {
+      "id": "macro-dashboard",
+      "name": "At the Margin",
+      "summary": "總經晨報",
+      "repo": "Macro-Dashboard",
+      "url": "https://macro-dashboard-aaalan1.vercel.app/",
+      "host": "vercel",
+      "supabase": "nwbfjoroqnhpymdtdbwu"
+    },
+    {
+      "id": "expense-app",
+      "name": "記帳",
+      "summary": "發票掃描記帳",
+      "repo": "expense-app",
+      "url": null,
+      "host": "vercel",
+      "supabase": "nwbfjoroqnhpymdtdbwu"
+    },
+    {
+      "id": "livelyrics",
+      "name": "Livelyrics",
+      "summary": "演出歌詞視覺",
+      "repo": "Livelyrics-",
+      "url": null,
+      "host": "vercel",
+      "okStatus": [401],
+      "notes": "https://app.notion.com/p/3e8cbee2351f810cac57f69e4b259b20"
+    },
+    {
+      "id": "casenote",
+      "name": "CaseNote",
+      "summary": "課堂即時轉錄",
+      "repo": "lecture-live-transcribe",
+      "url": "https://alanwu14832-bit.github.io/lecture-live-transcribe/",
+      "host": "github-pages",
+      "notes": "https://app.notion.com/p/3d5cbee2351f8101bf26ce0a6b882226"
+    }
+  ]
+}

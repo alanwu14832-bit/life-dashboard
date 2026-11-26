@@ -1,0 +1,23 @@
+{
+  // 一個 Worker 同時負責：網頁（dist/）、API（/api/*）、每 30 分鐘的自動檢查
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "life-dashboard",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "life-dashboard",
+      // 在 Cloudflare 建好 D1 資料庫後，把它的 ID 貼在這裡
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "triggers": { "crons": ["*/30 * * * *"] },
+  "observability": { "enabled": true }
+}

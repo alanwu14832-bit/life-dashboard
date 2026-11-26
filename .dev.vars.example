@@ -1,0 +1,2 @@
+# 本機測試用：複製成 .dev.vars 再填。正式環境的金鑰設在 Cloudflare 後台，不要放進 repo。
+GITHUB_TOKEN=
