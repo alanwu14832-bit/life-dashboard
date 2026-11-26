@@ -48,6 +48,13 @@ export interface Env {
 }
 
 const MIN_MANUAL_GAP_MS = 60_000;
+const MAX_MUTE_MINUTES = 24 * 60;
+
+/** 還在維護時段的平台：{ 平台代號: 結束時間 } */
+async function activeMutes(db: D1Database, now: number): Promise<Record<string, number>> {
+  const all = (await getKv<Record<string, number>>(db, 'mutes'))?.v ?? {};
+  return Object.fromEntries(Object.entries(all).filter(([, until]) => until > now));
+}
 const PUBLIC_FILES = new Set(['/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/favicon.svg']);
 /** 週日晚上 9 點（台北）寄週報 */
 const WEEKLY_CRON = '0 13 * * SUN';
@@ -143,7 +150,10 @@ export async function runChecks(env: Env): Promise<void> {
       // Notion 讀不到就這次不判斷排程
     }
   }
-  const changes = await processSignals(env.DB, signals, ts);
+  // 維護中的平台：照樣記錄檢查結果，但當作正常，不開異常、不寄信
+  const mutes = await activeMutes(env.DB, ts);
+  for (const sg of signals) if (sg.project && mutes[sg.project]) sg.failing = false;
+  const changes = (await processSignals(env.DB, signals, ts)).filter((c) => !(c.signal.project && mutes[c.signal.project]));
   await setKv(env.DB, 'lastResults', results, ts);
   const mail = composeMail(changes, ts, env.SITE_URL ?? 'https://life-dashboard.workers.dev');
   if (mail) {
@@ -165,9 +175,10 @@ export async function buildOverview(env: Env): Promise<Overview> {
   ]);
 
   const configs = await activeProjects(env.DB);
+  const mutes = await activeMutes(env.DB, now);
   const projects = configs.map((config) => {
     const up = summary.uptime.get(checkKey(config.id, 'http'));
-    return deriveHealth({
+    const view = deriveHealth({
       config,
       now,
       latestHttp: summary.latest.get(checkKey(config.id, 'http')) ?? null,
@@ -178,6 +189,7 @@ export async function buildOverview(env: Env): Promise<Overview> {
       repo: github?.v.repos[config.id] ?? null,
       domain: domains?.v[config.id] ?? null,
     });
+    return { ...view, mutedUntil: mutes[config.id] ?? null };
   });
 
   return {
@@ -352,6 +364,20 @@ async function route(req: Request, env: Env): Promise<Response> {
       throw err;
     }
   }
+  const mute = /^\/api\/projects\/([a-z0-9][a-z0-9-]{0,39})\/mute$/.exec(pathname);
+  if (mute && req.method === 'POST') {
+    await ensureSchema(env.DB);
+    const minutes = Number(((await req.json().catch(() => ({}))) as { minutes?: unknown }).minutes);
+    if (!Number.isFinite(minutes) || minutes < 0 || minutes > MAX_MUTE_MINUTES)
+      return json({ error: `暫停時間要在 0～${MAX_MUTE_MINUTES} 分鐘之間` }, 400);
+    const now = Date.now();
+    const mutes = await activeMutes(env.DB, now);
+    if (minutes === 0) delete mutes[mute[1]];
+    else mutes[mute[1]] = now + minutes * 60_000;
+    await setKv(env.DB, 'mutes', mutes, now);
+    return json({ mutedUntil: mutes[mute[1]] ?? null });
+  }
+
   const hist = /^\/api\/projects\/([a-z0-9][a-z0-9-]{0,39})\/history$/.exec(pathname);
   if (hist && req.method === 'GET') {
     await ensureSchema(env.DB);

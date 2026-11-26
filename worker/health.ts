@@ -58,6 +58,7 @@ export function deriveHealth(i: HealthInput): ProjectView {
     supabase: i.supabase,
     repo: i.repo,
     domain: i.domain,
+    mutedUntil: null,
   };
 }
 

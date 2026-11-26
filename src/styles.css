@@ -33,6 +33,46 @@
   color-scheme: light;
 }
 
+/* 夜間：暖炭灰底、米白字、淡墨綠強調。預設跟著系統外觀，頁尾可以手動切換 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+  --bg: #161614;
+  --paper: #1f1f1c;
+  --ink: #e8e6e0;
+  --muted: #a3a097;
+  --line: #34332e;
+  --accent: #8fc2ac;
+  --accent-ink: #161614;
+  --ok: #82c39f;
+  --ok-soft: #1c2a22;
+  --warn: #dcae5c;
+  --warn-soft: #2e2617;
+  --down: #ec8a76;
+  --down-soft: #34201b;
+  --unknown: #a3a097;
+  --tick-none: #2e2d29;
+  color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161614;
+  --paper: #1f1f1c;
+  --ink: #e8e6e0;
+  --muted: #a3a097;
+  --line: #34332e;
+  --accent: #8fc2ac;
+  --accent-ink: #161614;
+  --ok: #82c39f;
+  --ok-soft: #1c2a22;
+  --warn: #dcae5c;
+  --warn-soft: #2e2617;
+  --down: #ec8a76;
+  --down-soft: #34201b;
+  --unknown: #a3a097;
+  --tick-none: #2e2d29;
+  color-scheme: dark;
+}
+
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.65 var(--sans); -webkit-font-smoothing: antialiased; }
@@ -217,7 +257,7 @@ a.mini-title:hover { color: var(--accent); }
   color: var(--paper);
   cursor: pointer;
 }
-.btn:hover { background: #33332f; }
+.btn:hover { opacity: 0.88; }
 .btn:disabled { opacity: 0.6; cursor: progress; }
 .btn-quiet {
   font: 500 14px/1 var(--sans);
@@ -368,3 +408,16 @@ a.mini-title:hover { color: var(--accent); }
   .mkt { grid-template-columns: 56px minmax(0, 1fr); gap: var(--s-3); }
   .plat.wk { grid-template-columns: minmax(0, 1fr) auto auto; }
 }
+
+/* ── 維護時段 ── */
+.mute { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s-2) var(--s-4); font-size: 14px; margin-top: calc(-1 * var(--s-5) + var(--s-2)); }
+.mute-label { color: var(--muted); }
+.mute-state { color: var(--warn); }
+.mute-error { color: var(--down); font-size: 13px; flex-basis: 100%; }
+.plat-mute { color: var(--warn); }
+
+/* ── 外觀切換（頁尾） ── */
+.foot { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; }
+.theme-toggle { display: inline-flex; gap: var(--s-3); align-items: baseline; }
+.theme-toggle button { font: 12px/1.4 var(--sans); letter-spacing: 0.04em; color: var(--muted); background: none; border: 0; padding: 0; cursor: pointer; }
+.theme-toggle button[aria-pressed="true"] { color: var(--ink); font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }

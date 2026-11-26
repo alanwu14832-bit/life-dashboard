@@ -9,6 +9,7 @@ import { WeekAhead } from './components/briefing/WeekAhead';
 import { Settings } from './components/settings/Settings';
 import { Weekly } from './components/weekly/Weekly';
 import { ErrorState, PlatformsSkeleton, TodaySkeleton } from './components/States';
+import { ThemeToggle } from './components/ThemeToggle';
 import { useRoute } from './lib/route';
 import { useDashboardData } from './lib/useDashboardData';
 
@@ -61,7 +62,7 @@ export function App() {
         ) : route.name === 'week' ? (
           <Weekly />
         ) : route.name === 'detail' ? (
-          <Detail id={route.id} project={overview?.projects.find((p) => p.config.id === route.id)} now={now} />
+          <Detail id={route.id} project={overview?.projects.find((p) => p.config.id === route.id)} now={now} onChanged={d.reloadOverview} />
         ) : (
           <main className="brief" aria-label="今天的簡報">
             <Masthead overview={overview} today={today} now={now} />
@@ -88,7 +89,10 @@ export function App() {
         )}
       </div>
 
-      <footer className="foot">每 30 分鐘自動檢查一次 · 資料保留 30 天 · 新增或修改平台請到「設定」</footer>
+      <footer className="foot">
+        <span>每 30 分鐘自動檢查一次 · 資料保留 30 天 · 新增或修改平台請到「設定」</span>
+        <ThemeToggle />
+      </footer>
     </div>
   );
 }

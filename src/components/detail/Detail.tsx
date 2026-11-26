@@ -3,11 +3,12 @@ import type { ProjectHistory, ProjectView } from '../../../shared/types';
 import { fetchWithTimeout } from '../../lib/cache';
 import { pct } from '../../lib/format';
 import { LatencyChart } from './LatencyChart';
+import { MuteControl } from './MuteControl';
 import { QuickLinks } from './QuickLinks';
 import { UptimeBars } from './UptimeBars';
 import { span, when } from './util';
 
-export function Detail({ id, project, now }: { id: string; project: ProjectView | undefined; now: number }) {
+export function Detail({ id, project, now, onChanged }: { id: string; project: ProjectView | undefined; now: number; onChanged: () => void }) {
   const [hist, setHist] = useState<ProjectHistory | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,6 +38,7 @@ export function Detail({ id, project, now }: { id: string; project: ProjectView 
         </div>
       </div>
       {project && <QuickLinks c={project.config} />}
+      {project && <MuteControl id={project.config.id} mutedUntil={project.mutedUntil} onChanged={onChanged} />}
 
       {error && <p className="banner banner-down">{error}</p>}
       {!hist && !error && <p className="loading">讀取中…</p>}

@@ -75,6 +75,8 @@ export interface ProjectView {
   /** 給人看的異常原因，依嚴重程度排 */
   reasons: string[];
   stale: boolean;
+  /** 維護時段：通知暫停到這個時間（毫秒）；沒有暫停時是 null */
+  mutedUntil: number | null;
   http: {
     latest: CheckRow | null;
     uptime24h: number | null;

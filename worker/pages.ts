@@ -15,6 +15,7 @@ input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline
 button{font:500 15px/1 inherit;font-family:inherit;letter-spacing:.06em;padding:12px 16px;border:0;border-radius:2px;background:var(--ink);color:var(--paper);cursor:pointer}
 .error{background:var(--down-soft);color:var(--down);padding:8px 12px;border-left:2px solid currentColor;font-size:14px}
 code{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px}
+@media (prefers-color-scheme:dark){:root{--bg:#161614;--paper:#1f1f1c;--ink:#e8e6e0;--muted:#a3a097;--line:#34332e;--accent:#8fc2ac;--down:#ec8a76;--down-soft:#34201b;color-scheme:dark}}
 `;
 
 const escape = (s: string) =>

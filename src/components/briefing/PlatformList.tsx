@@ -1,5 +1,5 @@
 import type { ProjectView } from '../../../shared/types';
-import { ms } from '../../lib/format';
+import { clock, ms } from '../../lib/format';
 import { Ticks } from '../platforms/Ticks';
 
 /** 平台：一行一個，有狀況的排前面並直接寫出原因；點一下看詳細頁。 */
@@ -21,6 +21,7 @@ export function PlatformList({ projects, now, taskCounts }: { projects: ProjectV
                     {state}
                     {tasks > 0 && ` · ${tasks} 件待辦`}
                     {p.stale && ' · 停滯 30 天以上'}
+                    {p.mutedUntil && <span className="plat-mute"> · 維護中，通知暫停到 {clock(p.mutedUntil)}</span>}
                   </span>
                 </span>
                 {p.config.url ? <Ticks recent={p.http.recent} now={now} compact /> : <span />}
