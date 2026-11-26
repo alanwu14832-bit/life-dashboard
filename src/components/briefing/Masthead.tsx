@@ -1,4 +1,5 @@
 import type { Overview, ScheduleStatus, Today } from '../../../shared/types';
+import { AiFocus } from './AiFocus';
 import { buildLede } from './lede';
 
 const dateLine = (now: number) =>
@@ -37,6 +38,7 @@ export function Masthead({ overview, today, now }: { overview: Overview | null; 
       ) : (
         <p className="mast-lede is-loading">正在整理今天的狀況…</p>
       )}
+      <AiFocus date={today?.date} />
       {(brief?.headline || tw?.figure) && (
         <dl className="mast-market">
           {brief?.headline && <MarketItem label="今日焦點" s={brief} text={brief.headline} today={today?.date} />}

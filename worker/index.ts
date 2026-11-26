@@ -32,6 +32,7 @@ import {
   ValidationError,
 } from './projects';
 import { cachedToday, invalidateToday } from './today';
+import { AiLimitError, buildAiInput, ensureBrief, type AiOptions } from './ai';
 import { buildWeekly, composeWeeklyMail } from './weekly';
 import { checkKey, ensureSchema, getKv, insertChecks, projectHistory, setKv, summarize } from './store';
 
@@ -45,6 +46,7 @@ export interface Env {
   RESEND_API_KEY?: string;
   NOTIFY_EMAIL?: string;
   SITE_URL?: string;
+  ANTHROPIC_API_KEY?: string;
 }
 
 const MIN_MANUAL_GAP_MS = 60_000;
@@ -59,6 +61,21 @@ const PUBLIC_FILES = new Set(['/manifest.webmanifest', '/icon-192.png', '/icon-5
 /** 週日晚上 9 點（台北）寄週報 */
 const WEEKLY_CRON = '0 13 * * SUN';
 const DOMAIN_REFRESH_MS = 86_400_000;
+/** 早上 7 點後，例行檢查順便產生今天的 AI 建議 */
+const AI_AUTO_FROM_MIN = 7 * 60;
+
+function aiBrief(env: Env, now: number, opts: AiOptions = {}) {
+  return ensureBrief(
+    env.DB,
+    env.ANTHROPIC_API_KEY,
+    now,
+    async () => {
+      const [today, overview] = await Promise.all([cachedToday(env, false, now), buildOverview(env).catch(() => null)]);
+      return buildAiInput(today, overview, now);
+    },
+    opts,
+  );
+}
 
 /** 跑一輪全部檢查並寫進資料庫。排程每 30 分鐘呼叫一次，也可以從頁面手動觸發。 */
 export async function runChecks(env: Env): Promise<void> {
@@ -162,6 +179,14 @@ export async function runChecks(env: Env): Promise<void> {
   }
 
   await setKv(env.DB, 'lastRun', { ts, ms: Date.now() - ts }, ts);
+
+  if (env.ANTHROPIC_API_KEY && taipeiMinutes(ts) >= AI_AUTO_FROM_MIN) {
+    try {
+      await aiBrief(env, ts);
+    } catch (err) {
+      console.error('AI brief in cron failed', err);
+    }
+  }
 }
 
 export async function buildOverview(env: Env): Promise<Overview> {
@@ -296,6 +321,20 @@ async function route(req: Request, env: Env): Promise<Response> {
     await ensureSchema(env.DB);
     await ensureIncidents(env.DB);
     return json(await buildWeekly(env));
+  }
+
+  if (pathname === '/api/ai' && req.method === 'GET') {
+    await ensureSchema(env.DB);
+    return json(await aiBrief(env, Date.now()));
+  }
+  if (pathname === '/api/ai/regenerate' && req.method === 'POST') {
+    await ensureSchema(env.DB);
+    try {
+      return json(await aiBrief(env, Date.now(), { force: true }));
+    } catch (err) {
+      if (err instanceof AiLimitError) return json({ error: err.message }, 429);
+      throw err;
+    }
   }
 
   if (pathname === '/api/today' && req.method === 'GET') return json(await cachedToday(env, url.searchParams.has('fresh')));

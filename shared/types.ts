@@ -192,3 +192,27 @@ export interface ProjectHistory {
   incidents: { label: string; detail: string | null; openedAt: number; closedAt: number | null }[];
   uptime30d: number | null;
 }
+
+// ── AI 今日重點 ──────────────────────────────────────────
+
+export interface AiBrief {
+  /** 這份建議屬於哪一天（台北日期） */
+  date: string;
+  /** 產生時間（毫秒） */
+  at: number;
+  model: string;
+  headline: string;
+  steps: { when: string; action: string; why: string }[];
+  /** 今天手動重新產生了幾次 */
+  regenerations: number;
+  usage: { input: number; output: number };
+}
+
+export interface AiBriefResponse {
+  configured: boolean;
+  brief: AiBrief | null;
+  error: string | null;
+  regenerationsLeft: number;
+  /** 正在產生中（另一個請求或排程已經在呼叫） */
+  pending: boolean;
+}
