@@ -2,19 +2,29 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Health, Overview, ProjectView, Today } from '../shared/types';
 import { ago, clock, hostLabel, ms, pct, today } from './format';
 import { clearCache, fetchWithTimeout, readCache, writeCache } from './cache';
+import { Detail } from './Detail';
 import { Settings } from './Settings';
 import { TodayPanel } from './Today';
 
-/** 用網址 # 切換頁面：#settings 是設定頁，其他都是控制台 */
-function useView(): 'dashboard' | 'settings' {
-  const read = (): 'dashboard' | 'settings' => (location.hash === '#settings' ? 'settings' : 'dashboard');
-  const [view, setView] = useState(read);
+/** 用網址 # 切換頁面：#settings 設定、#p-<代號> 平台詳細頁，其他都是控制台 */
+type Route = { name: 'dashboard' } | { name: 'settings' } | { name: 'detail'; id: string };
+function readRoute(): Route {
+  const h = location.hash.slice(1);
+  if (h === 'settings') return { name: 'settings' };
+  const m = /^p-([a-z0-9][a-z0-9-]{0,39})$/.exec(h);
+  return m ? { name: 'detail', id: m[1] } : { name: 'dashboard' };
+}
+function useRoute(): Route {
+  const [route, setRoute] = useState(readRoute);
   useEffect(() => {
-    const on = () => setView(read());
+    const on = () => {
+      setRoute(readRoute());
+      window.scrollTo(0, 0);
+    };
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);
   }, []);
-  return view;
+  return route;
 }
 
 const POLL_MS = 5 * 60_000;
@@ -30,7 +40,8 @@ export function App() {
   const [now, setNow] = useState(Date.now());
   const [todayData, setTodayData] = useState<Today | null>(() => readCache<Today>('today')?.data ?? null);
   const [refreshing, setRefreshing] = useState(true);
-  const view = useView();
+  const route = useRoute();
+  const view = route.name;
 
   const loadToday = useCallback(async () => {
     try {
@@ -132,8 +143,8 @@ export function App() {
               '還沒有檢查紀錄'
             )}
           </span>
-          <a className="btn-quiet nav-link" href={view === 'settings' ? '#' : '#settings'}>
-            {view === 'settings' ? '回控制台' : '設定'}
+          <a className="btn-quiet nav-link" href={view === 'dashboard' ? '#settings' : '#'}>
+            {view === 'dashboard' ? '設定' : '回控制台'}
           </a>
           <button type="button" className="btn" onClick={runNow} disabled={running}>
             {running ? '檢查中…' : '立即檢查'}
@@ -158,8 +169,10 @@ export function App() {
         <p className="banner banner-muted">GitHub 資料沒更新：{data.github.error}</p>
       )}
 
-      {view === 'settings' ? (
+      {route.name === 'settings' ? (
         <Settings onChanged={load} />
+      ) : route.name === 'detail' ? (
+        <Detail id={route.id} project={data?.projects.find((p) => p.config.id === route.id)} now={now} />
       ) : (
         <>
         <Summary data={data} today={todayData} counts={counts} now={now} />
@@ -286,6 +299,7 @@ function ProjectRow({ p, now, openTasks, onExpand }: { p: ProjectView; now: numb
         <a href={`https://github.com/${OWNER}/${config.repo}`} target="_blank" rel="noreferrer">
           GitHub
         </a>
+        <a href={`#p-${config.id}`}>詳細</a>
       </nav>
     </div>
   );
@@ -362,6 +376,7 @@ function ProjectCard({ p, now, openTasks, onCollapse }: { p: ProjectView; now: n
               筆記
             </a>
           )}
+          <a href={`#p-${config.id}`}>詳細</a>
         </nav>
       </div>
     </article>

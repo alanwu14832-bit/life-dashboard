@@ -53,6 +53,12 @@ Notion 和 Google 行事曆仍是唯一的輸入處，這裡只負責看，以�
 
 行事曆解析是自己寫的輕量版本（`worker/ics.ts`），支援每天／每週／每月／每年重複、停課（EXDATE）、單次改時間（RECURRENCE-ID）與時區；解析結果快取 5 分鐘，以免超過免費方案每次 10ms 的 CPU 上限。
 
+## 異常通知與詳細頁
+
+- **通知（Email，經 Resend）**：網站或 Supabase 連續兩次檢查失敗（每次檢查本身已重試一次）、自訂網域 30 天內到期、平日 18:00 後晨間簡報或台股收盤還沒寫入時寄信；恢復時再寄一封並附上中斷多久。同一件事在恢復前不重複寄，同一次檢查的多個變化合成一封。
+- 需要兩個 Secret：`RESEND_API_KEY`（resend.com → API Keys）與 `NOTIFY_EMAIL`（註冊 Resend 用的信箱；寄件人用 onboarding@resend.dev，只能寄給自己）。設定頁有「寄一封測試信」。
+- **詳細頁**：卡片或列上的「詳細」，或網址 `#p-<代號>`。30 天每日可用率、7 天每小時回應時間、異常紀錄（保留 90 天）。
+
 ## 登入機制
 
 - 密碼存在 Cloudflare Secret，不在程式碼裡。登入後發一個簽章過的 cookie（HttpOnly、Secure、SameSite=Lax），30 天有效。

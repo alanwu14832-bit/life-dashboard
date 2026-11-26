@@ -19,5 +19,7 @@
     }
   ],
   "triggers": { "crons": ["*/30 * * * *"] },
+  // 寫在通知信裡的控制台網址（不是機密）
+  "vars": { "SITE_URL": "https://life-dashboard.alanwu14832.workers.dev" },
   "observability": { "enabled": true }
 }

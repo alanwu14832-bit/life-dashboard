@@ -120,3 +120,47 @@ export async function summarize(db: D1Database, now: number): Promise<CheckSumma
 }
 
 export { key as checkKey };
+
+/** 單一平台的歷史：30 天每日可用率、7 天每小時回應時間。 */
+export async function projectHistory(db: D1Database, project: string, now: number) {
+  const DAY = 86_400_000;
+  const TZ_OFFSET = 8 * 3_600_000; // 台北
+  const todayIdx = Math.floor((now + TZ_OFFSET) / DAY);
+  const since30 = (todayIdx - 29) * DAY - TZ_OFFSET;
+  const since7 = now - 7 * DAY;
+  const [daily, hourly] = await db.batch<{ k: number; n: number; up: number; avg: number | null }>([
+    db
+      .prepare(
+        // 綁定的參數可能被當成小數，所以明確轉成整數再除
+        `SELECT CAST((ts + CAST(?1 AS INTEGER)) / CAST(?2 AS INTEGER) AS INTEGER) AS k, COUNT(*) AS n, SUM(ok) AS up, NULL AS avg
+         FROM checks WHERE project = ?3 AND kind = 'http' AND ts >= ?4 GROUP BY k`,
+      )
+      .bind(TZ_OFFSET, DAY, project, since30),
+    db
+      .prepare(
+        `SELECT CAST(ts / 3600000 AS INTEGER) AS k, COUNT(*) AS n, SUM(ok) AS up, AVG(CASE WHEN ok = 1 THEN ms END) AS avg
+         FROM checks WHERE project = ? AND kind = 'http' AND ts >= ? GROUP BY k`,
+      )
+      .bind(project, since7),
+  ]);
+  const byDay = new Map(daily.results.map((r) => [r.k, r]));
+  const days = Array.from({ length: 30 }, (_, i) => {
+    const k = todayIdx - 29 + i;
+    const r = byDay.get(k);
+    return {
+      date: new Date(k * DAY).toISOString().slice(0, 10),
+      uptime: r && r.n ? r.up / r.n : null,
+      checks: r?.n ?? 0,
+    };
+  });
+  const byHour = new Map(hourly.results.map((r) => [r.k, r]));
+  const firstHour = Math.floor(since7 / 3_600_000) + 1;
+  const latency = Array.from({ length: 168 }, (_, i) => {
+    const k = firstHour + i;
+    const r = byHour.get(k);
+    return { ts: k * 3_600_000, ms: r?.avg != null ? Math.round(r.avg) : null, down: !!r && r.up < r.n };
+  });
+  const total = daily.results.reduce((a, r) => a + r.n, 0);
+  const up = daily.results.reduce((a, r) => a + r.up, 0);
+  return { days, latency, uptime30d: total ? up / total : null };
+}

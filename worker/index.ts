@@ -14,9 +14,11 @@ import {
   sessionCookie,
   verifySession,
 } from './auth';
+import { composeMail, ensureIncidents, processSignals, sendMail, type Signal } from './alerts';
 import { checkHttp, checkSupabase, fetchDomain, fetchGithub, withRetry } from './checks';
 import { deriveHealth, sortByHealth } from './health';
-import { completeTask, NotionError } from './notion';
+import { completeTask, fetchSchedules, NotionError } from './notion';
+import { taipeiMinutes, weekday, ymdIn } from './time';
 import { loginPage, setupPage } from './pages';
 import {
   activeProjects,
@@ -30,7 +32,7 @@ import {
   ValidationError,
 } from './projects';
 import { cachedToday, invalidateToday } from './today';
-import { checkKey, ensureSchema, getKv, insertChecks, setKv, summarize } from './store';
+import { checkKey, ensureSchema, getKv, insertChecks, projectHistory, setKv, summarize } from './store';
 
 export interface Env {
   DB: D1Database;
@@ -39,6 +41,9 @@ export interface Env {
   DASHBOARD_PASSWORD?: string;
   NOTION_TOKEN?: string;
   CALENDAR_ICS_URL?: string;
+  RESEND_API_KEY?: string;
+  NOTIFY_EMAIL?: string;
+  SITE_URL?: string;
 }
 
 const MIN_MANUAL_GAP_MS = 60_000;
@@ -74,12 +79,72 @@ export async function runChecks(env: Env): Promise<void> {
   await setKv(env.DB, 'github', github, ts);
 
   const withDomain = projects.filter((p) => p.domain);
+  let domains: Record<string, DomainInfo> = {};
   if (withDomain.length) {
     const prev = await getKv<Record<string, DomainInfo>>(env.DB, 'domains');
+    domains = prev?.v ?? {};
     if (!prev || ts - prev.ts > DOMAIN_REFRESH_MS) {
       const list = await Promise.all(withDomain.map((p) => fetchDomain(p.domain!)));
-      await setKv(env.DB, 'domains', Object.fromEntries(withDomain.map((p, i) => [p.id, list[i]])), ts);
+      domains = Object.fromEntries(withDomain.map((p, i) => [p.id, list[i]]));
+      await setKv(env.DB, 'domains', domains, ts);
     }
+  }
+
+  // ── 異常通知 ──
+  const prevResults = (await getKv<Record<string, boolean>>(env.DB, 'lastResults'))?.v ?? {};
+  const results: Record<string, boolean> = {};
+  const signals: Signal[] = [];
+  for (const r of rows) {
+    const key = `${r.kind === 'http' ? 'site' : 'supabase'}:${r.project}`;
+    const name = projects.find((p) => p.id === r.project)?.name ?? r.project;
+    results[key] = r.result.ok;
+    signals.push({
+      key,
+      project: r.project,
+      label: r.kind === 'http' ? `${name} 網站` : `${name} 的 Supabase`,
+      failing: !r.result.ok,
+      prevFailing: prevResults[key] === false,
+      detail: r.kind === 'http' ? `打不開（${r.result.error ?? '未知錯誤'}）` : '沒有正常回應，可能被暫停',
+    });
+  }
+  for (const p of withDomain) {
+    const d = domains[p.id];
+    if (!d?.expires) continue;
+    const days = Math.floor((Date.parse(d.expires) - ts) / 86_400_000);
+    signals.push({
+      key: `domain:${p.id}`,
+      project: p.id,
+      label: `${p.name} 的網域 ${d.domain}`,
+      failing: days < 30,
+      prevFailing: true,
+      detail: `${days} 天後到期（${d.expires.slice(0, 10)}），記得續約`,
+    });
+  }
+  // 排程：平日傍晚 6 點後還沒寫入今天那一筆；寫進去之後會寄「恢復」
+  const today = ymdIn(ts);
+  const dow = weekday(today);
+  if (env.NOTION_TOKEN && dow !== 0 && dow !== 6 && taipeiMinutes(ts) >= 18 * 60) {
+    try {
+      for (const sch of await fetchSchedules(env.NOTION_TOKEN, today, ts)) {
+        signals.push({
+          key: `schedule:${sch.name}:${today}`,
+          project: null,
+          label: `排程「${sch.name}」`,
+          failing: sch.state === 'late',
+          prevFailing: true,
+          detail: `今天還沒有寫入（最新一筆是 ${sch.latestDate ?? '無'}），排程可能斷了`,
+        });
+      }
+    } catch {
+      // Notion 讀不到就這次不判斷排程
+    }
+  }
+  const changes = await processSignals(env.DB, signals, ts);
+  await setKv(env.DB, 'lastResults', results, ts);
+  const mail = composeMail(changes, ts, env.SITE_URL ?? 'https://life-dashboard.workers.dev');
+  if (mail) {
+    const sent = await sendMail(env, mail);
+    await setKv(env.DB, 'notifyLast', { ts, subject: mail.subject, ...sent }, ts);
   }
 
   await setKv(env.DB, 'lastRun', { ts, ms: Date.now() - ts }, ts);
@@ -219,6 +284,26 @@ async function route(req: Request, env: Env): Promise<Response> {
     return json(await buildOverview(env));
   }
 
+  // 設定頁：通知
+  if (pathname === '/api/notify' && req.method === 'GET') {
+    const last = await getKv<{ ts: number; subject: string; ok: boolean; error: string | null }>(env.DB, 'notifyLast');
+    await ensureIncidents(env.DB);
+    const { results: open } = await env.DB
+      .prepare('SELECT label, detail, opened_at FROM incidents WHERE closed_at IS NULL ORDER BY opened_at DESC')
+      .all<{ label: string; detail: string; opened_at: number }>();
+    return json({ configured: !!(env.RESEND_API_KEY && env.NOTIFY_EMAIL), last: last?.v ?? null, open });
+  }
+  if (pathname === '/api/notify/test' && req.method === 'POST') {
+    const ts = Date.now();
+    const mail = {
+      subject: '【測試】專案控制台通知',
+      text: `這是一封測試信。收到就代表異常通知設定成功。\n\n之後網站或 Supabase 連續兩次檢查失敗、網域快到期、排程斷掉時，會寄信到這個信箱；恢復時也會通知。\n\n控制台：${env.SITE_URL ?? ''}`,
+    };
+    const sent = await sendMail(env, mail);
+    await setKv(env.DB, 'notifyLast', { ts, subject: mail.subject, ...sent }, ts);
+    return json(sent, sent.ok ? 200 : 502);
+  }
+
   // 設定頁：平台清單
   if (pathname === '/api/projects') {
     try {
@@ -241,6 +326,21 @@ async function route(req: Request, env: Env): Promise<Response> {
       throw err;
     }
   }
+  const hist = /^\/api\/projects\/([a-z0-9][a-z0-9-]{0,39})\/history$/.exec(pathname);
+  if (hist && req.method === 'GET') {
+    await ensureSchema(env.DB);
+    await ensureIncidents(env.DB);
+    const now = Date.now();
+    const [h, inc] = await Promise.all([
+      projectHistory(env.DB, hist[1], now),
+      env.DB
+        .prepare('SELECT label, detail, opened_at AS openedAt, closed_at AS closedAt FROM incidents WHERE project = ? ORDER BY opened_at DESC LIMIT 30')
+        .bind(hist[1])
+        .all<{ label: string; detail: string | null; openedAt: number; closedAt: number | null }>(),
+    ]);
+    return json({ ...h, incidents: inc.results });
+  }
+
   const one = /^\/api\/projects\/([a-z0-9][a-z0-9-]{0,39})$/.exec(pathname);
   if (one && (req.method === 'PUT' || req.method === 'DELETE')) {
     try {

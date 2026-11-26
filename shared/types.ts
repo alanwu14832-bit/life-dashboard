@@ -148,3 +148,14 @@ export interface Today {
   schedules: Section<ScheduleStatus[]>;
   knowledge: Section<KnowledgeItem[]>;
 }
+
+// ── 單一平台詳細頁 ──────────────────────────────────────────
+
+export interface ProjectHistory {
+  /** 最近 30 天每天的可用率（台北日期），沒有紀錄的天是 null */
+  days: { date: string; uptime: number | null; checks: number }[];
+  /** 最近 7 天每小時的平均回應時間（毫秒） */
+  latency: { ts: number; ms: number | null; down: boolean }[];
+  incidents: { label: string; detail: string | null; openedAt: number; closedAt: number | null }[];
+  uptime30d: number | null;
+}
