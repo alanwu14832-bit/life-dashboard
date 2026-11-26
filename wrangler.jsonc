@@ -14,8 +14,7 @@
     {
       "binding": "DB",
       "database_name": "life-dashboard",
-      // 在 Cloudflare 建好 D1 資料庫後，把它的 ID 貼在這裡
-      "database_id": "00000000-0000-0000-0000-000000000000"
+      "database_id": "35248f86-ef86-4db1-a708-dfdb77070fb2"
     }
   ],
   "triggers": { "crons": ["*/30 * * * *"] },
