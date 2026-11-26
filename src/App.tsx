@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import type { Health } from '../shared/types';
 import { Detail } from './components/detail/Detail';
 import { Header } from './components/Header';
-import { Platforms } from './components/platforms/Platforms';
+import { Masthead } from './components/briefing/Masthead';
+import { PlatformList } from './components/briefing/PlatformList';
+import { SideNotes } from './components/briefing/SideNotes';
+import { TodayTimeline } from './components/briefing/TodayTimeline';
+import { WeekAhead } from './components/briefing/WeekAhead';
 import { Settings } from './components/settings/Settings';
-import { ErrorState, PlatformsSkeleton } from './components/States';
-import { Summary } from './components/Summary';
-import { TodayPanel } from './components/today/TodayPanel';
+import { ErrorState, PlatformsSkeleton, TodaySkeleton } from './components/States';
 import { useRoute } from './lib/route';
 import { useDashboardData } from './lib/useDashboardData';
 
@@ -26,8 +27,6 @@ export function App() {
   const now = useNow();
   const { overview, today } = d;
 
-  const counts: Record<Health, number> = { down: 0, warn: 0, unknown: 0, ok: 0 };
-  overview?.projects.forEach((p) => counts[p.health]++);
   const scheduleLate = overview?.lastRun ? now - overview.lastRun.ts > 75 * 60_000 : false;
 
   return (
@@ -61,25 +60,32 @@ export function App() {
         ) : route.name === 'detail' ? (
           <Detail id={route.id} project={overview?.projects.find((p) => p.config.id === route.id)} now={now} />
         ) : (
-          <>
-            <Summary data={overview} today={today} counts={counts} now={now} />
-            <div className="layout">
-              <TodayPanel today={today} error={d.todayError} now={now} onTaskDone={d.completeTask} onRetry={d.reloadToday} />
-              <main className="platforms" aria-label="平台">
-                {overview ? (
-                  <Platforms projects={overview.projects} now={now} taskCounts={today?.platformTasks.data ?? {}} />
-                ) : d.overviewError ? (
-                  <ErrorState message={d.overviewError} onRetry={d.reloadOverview} />
-                ) : (
-                  <PlatformsSkeleton />
-                )}
-              </main>
-            </div>
-          </>
+          <main className="brief" aria-label="今天的簡報">
+            <Masthead overview={overview} today={today} now={now} />
+            {today ? (
+              <>
+                {d.todayError && <ErrorState message={`${d.todayError}（下面是上一次的資料）`} onRetry={d.reloadToday} />}
+                <TodayTimeline today={today} now={now} onTaskDone={d.completeTask} />
+                <WeekAhead today={today} onTaskDone={d.completeTask} />
+              </>
+            ) : d.todayError ? (
+              <ErrorState message={d.todayError} onRetry={d.reloadToday} />
+            ) : (
+              <TodaySkeleton />
+            )}
+            {overview ? (
+              <PlatformList projects={overview.projects} now={now} taskCounts={today?.platformTasks.data ?? {}} />
+            ) : d.overviewError ? (
+              <ErrorState message={d.overviewError} onRetry={d.reloadOverview} />
+            ) : (
+              <PlatformsSkeleton />
+            )}
+            {today && <SideNotes today={today} now={now} />}
+          </main>
         )}
       </div>
 
-      <footer className="foot">每 30 分鐘自動檢查一次，資料保留 30 天。新增或修改平台：右上角「設定」。</footer>
+      <footer className="foot">每 30 分鐘自動檢查一次 · 資料保留 30 天 · 新增或修改平台請到「設定」</footer>
     </div>
   );
 }
