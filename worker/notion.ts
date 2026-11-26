@@ -93,16 +93,33 @@ async function courseNames(token: string, f: Fetch): Promise<Map<string, string>
   }
 }
 
-/** 逾期、今天到期、7 天內到期，而且還沒完成的待辦。 */
+/**
+ * 逾期、今天到期、7 天內到期，而且還沒完成的待辦。
+ * 分兩次查：逾期的從最近的開始取，今天起 7 天內的照截止日排，
+ * 這樣累積了很多沒打勾的舊待辦時，也不會把今天和這週的擠掉。
+ */
 export async function fetchTasks(token: string, today: string, f: Fetch = fetch): Promise<TaskItem[]> {
-  const [{ results }, courses] = await Promise.all([
+  const notDone = { property: P.status, select: { does_not_equal: P.done } };
+  const [overdue, upcoming, courses] = await Promise.all([
+    query(
+      token,
+      SOURCES.tasks,
+      {
+        filter: { and: [notDone, { property: P.due, date: { before: today } }] },
+        sorts: [{ property: P.due, direction: 'descending' }],
+        page_size: 50,
+      },
+      '✅ Tasks 待辦事項',
+      f,
+    ),
     query(
       token,
       SOURCES.tasks,
       {
         filter: {
           and: [
-            { property: P.status, select: { does_not_equal: P.done } },
+            notDone,
+            { property: P.due, date: { on_or_after: today } },
             { property: P.due, date: { on_or_before: addDays(today, 7) } },
           ],
         },
@@ -115,11 +132,14 @@ export async function fetchTasks(token: string, today: string, f: Fetch = fetch)
     courseNames(token, f),
   ]);
 
-  return results.map((page) => {
+  const seen = new Set<string>();
+  return [...overdue.results, ...upcoming.results].flatMap((page) => {
+    if (seen.has(page.id)) return [];
+    seen.add(page.id);
     const pr = page.properties;
     const due = date(pr[P.due]);
     const dueDay = due?.slice(0, 10) ?? today;
-    return {
+    const item: TaskItem = {
       id: page.id,
       title: text(pr[P.title]) || '（無標題）',
       url: page.url,
@@ -133,6 +153,7 @@ export async function fetchTasks(token: string, today: string, f: Fetch = fetch)
         .filter((n): n is string => !!n),
       bucket: dueDay < today ? 'overdue' : dueDay === today ? 'today' : 'soon',
     };
+    return [item];
   });
 }
 

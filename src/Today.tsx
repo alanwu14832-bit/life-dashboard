@@ -106,10 +106,13 @@ function EventList({ events, now }: { events: CalendarEvent[]; now: number }) {
   );
 }
 
+const OVERDUE_PREVIEW = 5;
+
 const BUCKET_LABEL: Record<TaskItem['bucket'], string> = { overdue: '逾期', today: '今天到期', soon: '7 天內' };
 
 function TasksBlock({ section, onTaskDone }: { section: Section<TaskItem[]>; onTaskDone: (id: string) => Promise<void> }) {
   const [busy, setBusy] = useState<Record<string, 'saving' | 'error'>>({});
+  const [showAllOverdue, setShowAllOverdue] = useState(false);
   const head = (
     <div className="block-head">
       <h3>待辦</h3>
@@ -149,7 +152,7 @@ function TasksBlock({ section, onTaskDone }: { section: Section<TaskItem[]>; onT
             {BUCKET_LABEL[g.bucket]} · {g.items.length}
           </p>
           <ul className="tasks">
-            {g.items.map((t) => (
+            {(g.bucket === 'overdue' && !showAllOverdue ? g.items.slice(0, OVERDUE_PREVIEW) : g.items).map((t) => (
               <li key={t.id} className={busy[t.id] === 'saving' ? 'is-saving' : undefined}>
                 <input
                   type="checkbox"
@@ -179,6 +182,11 @@ function TasksBlock({ section, onTaskDone }: { section: Section<TaskItem[]>; onT
               </li>
             ))}
           </ul>
+          {g.bucket === 'overdue' && g.items.length > OVERDUE_PREVIEW && (
+            <button type="button" className="link-btn" onClick={() => setShowAllOverdue((v) => !v)}>
+              {showAllOverdue ? '只看最近 5 件' : `再顯示 ${g.items.length - OVERDUE_PREVIEW} 件更早的逾期`}
+            </button>
+          )}
         </div>
       ))}
     </section>

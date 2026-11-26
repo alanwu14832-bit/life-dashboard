@@ -49,20 +49,26 @@ const task = (id: string, name: string, due: string, extra: Record<string, unkno
 });
 
 describe('待辦', () => {
-  it('查詢條件：未完成、7 天內到期，依截止日排序', async () => {
+  it('分兩次查：逾期的從最近開始取，今天起 7 天內的照截止日排', async () => {
     const { f, calls } = fakeNotion({
       [`data_sources/${SOURCES.tasks}/query`]: { results: [] },
       [`data_sources/${SOURCES.courses}/query`]: { results: [] },
     });
     await fetchTasks('secret', '2026-11-26', f);
-    const q = calls.find((c) => c.url.includes(SOURCES.tasks))!;
-    expect(q.method).toBe('POST');
-    expect(q.headers['notion-version']).toBe('2025-09-03');
-    expect(q.headers.authorization).toBe('Bearer secret');
-    expect(q.body).toMatchObject({
+    const qs = calls.filter((c) => c.url.includes(SOURCES.tasks));
+    expect(qs).toHaveLength(2);
+    expect(qs[0].method).toBe('POST');
+    expect(qs[0].headers['notion-version']).toBe('2025-09-03');
+    expect(qs[0].headers.authorization).toBe('Bearer secret');
+    expect(qs[0].body).toMatchObject({
+      filter: { and: [{ property: '狀態 Status', select: { does_not_equal: '完成 Done' } }, { property: '截止日 Due', date: { before: '2026-11-26' } }] },
+      sorts: [{ property: '截止日 Due', direction: 'descending' }],
+    });
+    expect(qs[1].body).toMatchObject({
       filter: {
         and: [
           { property: '狀態 Status', select: { does_not_equal: '完成 Done' } },
+          { property: '截止日 Due', date: { on_or_after: '2026-11-26' } },
           { property: '截止日 Due', date: { on_or_before: '2026-12-03' } },
         ],
       },
