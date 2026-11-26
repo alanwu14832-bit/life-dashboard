@@ -13,6 +13,18 @@ function describe(err: unknown): string {
   return String(err);
 }
 
+/** 失敗時隔一下再試一次，避免一次網路抖動就亮紅燈。第二次的結果為準。 */
+export async function withRetry(
+  run: () => Promise<CheckResult>,
+  delayMs = 3_000,
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+): Promise<CheckResult> {
+  const first = await run();
+  if (first.ok) return first;
+  await sleep(delayMs);
+  return run();
+}
+
 /** 打一次網站首頁：2xx、3xx 或設定裡允許的狀態碼算正常。 */
 export async function checkHttp(url: string, okStatus: number[] = [], f: Fetch = fetch): Promise<CheckResult> {
   const start = Date.now();

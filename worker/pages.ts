@@ -4,7 +4,7 @@ const STYLE = `
 :root{--bg:#eef1f5;--surface:#fff;--ink:#16202b;--muted:#5a6776;--line:#d9e0e8;--accent:#1f5fbf;--accent-ink:#fff;--down:#b42318;--down-soft:#fbe6e3;color-scheme:light}
 @media (prefers-color-scheme:dark){:root{--bg:#0e1319;--surface:#151c24;--ink:#e5eaf0;--muted:#93a1b1;--line:#27323e;--accent:#6c9ff0;--accent-ink:#0b1220;--down:#f2705f;--down-soft:#351a17;color-scheme:dark}}
 *{box-sizing:border-box}
-body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--ink);font:15px/1.55 'IBM Plex Sans','Noto Sans TC','PingFang TC','Microsoft JhengHei',system-ui,sans-serif;padding:24px max(16px,env(safe-area-inset-right)) 24px max(16px,env(safe-area-inset-left))}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--ink);font:15px/1.55 'IBM Plex Sans','PingFang TC','Noto Sans TC','Microsoft JhengHei',system-ui,sans-serif;padding:24px max(16px,env(safe-area-inset-right)) 24px max(16px,env(safe-area-inset-left))}
 main{width:100%;max-width:360px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:28px 24px;display:flex;flex-direction:column;gap:16px}
 h1{margin:0;font-size:20px;font-weight:600}
 p{margin:0;color:var(--muted);font-size:14px}

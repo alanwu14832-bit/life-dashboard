@@ -208,3 +208,21 @@ describe('今天區塊', () => {
     expect(today.calendar.data?.map((e) => e.title)).toEqual(['社課']);
   });
 });
+
+describe('今天區塊快取', () => {
+  it('60 秒內重複讀取用快取，勾選完成後清掉', async () => {
+    const { cachedToday, invalidateToday } = await import('../worker/today');
+    invalidateToday();
+    const t0 = Date.parse('2026-11-26T10:00:00+08:00');
+    const a = await cachedToday({}, false, t0);
+    const b = await cachedToday({}, false, t0 + 30_000);
+    expect(b).toBe(a);
+    const c = await cachedToday({}, false, t0 + 61_000);
+    expect(c).not.toBe(a);
+    invalidateToday();
+    const d = await cachedToday({}, false, t0 + 62_000);
+    expect(d).not.toBe(c);
+    const e = await cachedToday({}, true, t0 + 63_000);
+    expect(e).not.toBe(d);
+  });
+});

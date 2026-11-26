@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Health, Overview, ProjectView, Today } from '../shared/types';
 import { ago, clock, hostLabel, ms, pct, today } from './format';
+import { clearCache, fetchWithTimeout, readCache, writeCache } from './cache';
 import { TodayPanel } from './Today';
 
 const POLL_MS = 5 * 60_000;
@@ -9,17 +10,23 @@ const OWNER = 'alanwu14832-bit';
 const HEALTH_LABEL: Record<Health, string> = { down: '異常', warn: '注意', unknown: '未設定', ok: '正常' };
 
 export function App() {
-  const [data, setData] = useState<Overview | null>(null);
+  // 先用上一次的資料把畫面畫出來，再到背景更新
+  const [data, setData] = useState<Overview | null>(() => readCache<Overview>('overview')?.data ?? null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [now, setNow] = useState(Date.now());
-  const [todayData, setTodayData] = useState<Today | null>(null);
+  const [todayData, setTodayData] = useState<Today | null>(() => readCache<Today>('today')?.data ?? null);
+  const [refreshing, setRefreshing] = useState(true);
 
   const loadToday = useCallback(async () => {
     try {
-      const res = await fetch('/api/today');
+      const res = await fetchWithTimeout('/api/today');
       if (res.status === 401) return location.reload();
-      if (res.ok) setTodayData((await res.json()) as Today);
+      if (res.ok) {
+        const body = (await res.json()) as Today;
+        setTodayData(body);
+        writeCache('today', body);
+      }
     } catch {
       // 今天區塊讀不到時保留上一次的內容
     }
@@ -35,21 +42,24 @@ export function App() {
       const task = t.tasks.data.find((x) => x.id === id);
       const counts = { ...(t.platformTasks.data ?? {}) };
       if (task?.platform && counts[task.platform]) counts[task.platform] -= 1;
-      return {
+      const next: Today = {
         ...t,
         tasks: { ...t.tasks, data: t.tasks.data.filter((x) => x.id !== id) },
         platformTasks: t.platformTasks.data ? { ...t.platformTasks, data: counts } : t.platformTasks,
       };
+      writeCache('today', next);
+      return next;
     });
   }, []);
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/overview');
+      const res = await fetchWithTimeout('/api/overview');
       if (res.status === 401) return location.reload(); // 登入過期，重新整理會出現登入頁
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       setData(body as Overview);
+      writeCache('overview', body);
       setError(null);
     } catch (err) {
       setError(`讀不到監控資料：${err instanceof Error ? err.message : String(err)}`);
@@ -57,8 +67,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    load();
-    loadToday();
+    Promise.allSettled([load(), loadToday()]).then(() => setRefreshing(false));
     const poll = setInterval(() => {
       load();
       loadToday();
@@ -68,16 +77,17 @@ export function App() {
       clearInterval(poll);
       clearInterval(tick);
     };
-  }, [load]);
+  }, [load, loadToday]);
 
   const runNow = async () => {
     setRunning(true);
     try {
-      const res = await fetch('/api/run', { method: 'POST' });
+      const res = await fetchWithTimeout('/api/run', { method: 'POST' }, 60_000);
       if (res.status === 401) return location.reload();
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       setData(body as Overview);
+      writeCache('overview', body);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -102,6 +112,7 @@ export function App() {
             {data?.lastRun ? (
               <>
                 上次檢查 <time className="num">{clock(data.lastRun.ts)}</time>（{ago(data.lastRun.ts, now)}）
+                {refreshing && <span className="refreshing"> · 更新中…</span>}
               </>
             ) : (
               '還沒有檢查紀錄'
@@ -110,7 +121,7 @@ export function App() {
           <button type="button" className="btn" onClick={runNow} disabled={running}>
             {running ? '檢查中…' : '立即檢查'}
           </button>
-          <form method="post" action="/logout">
+          <form method="post" action="/logout" onSubmit={clearCache}>
             <button type="submit" className="btn-quiet">
               登出
             </button>

@@ -57,3 +57,19 @@ export async function buildToday(env: TodayEnv, now = Date.now(), f: Fetch = fet
 
   return { date, tasks, platformTasks, calendar, schedules, knowledge };
 }
+
+// 整個今天區塊在同一個 Worker 執行個體裡快取 60 秒；勾選完成後清掉
+const TODAY_TTL_MS = 60_000;
+let todayCache: { at: number; date: string; data: Today } | null = null;
+
+export async function cachedToday(env: TodayEnv, fresh = false, now = Date.now()): Promise<Today> {
+  const date = ymdIn(now);
+  if (!fresh && todayCache && todayCache.date === date && now - todayCache.at < TODAY_TTL_MS) return todayCache.data;
+  const data = await buildToday(env, now);
+  todayCache = { at: now, date, data };
+  return data;
+}
+
+export function invalidateToday(): void {
+  todayCache = null;
+}

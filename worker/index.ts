@@ -15,11 +15,11 @@ import {
   sessionCookie,
   verifySession,
 } from './auth';
-import { checkHttp, checkSupabase, fetchDomain, fetchGithub } from './checks';
+import { checkHttp, checkSupabase, fetchDomain, fetchGithub, withRetry } from './checks';
 import { deriveHealth, sortByHealth } from './health';
 import { completeTask, NotionError } from './notion';
 import { loginPage, setupPage } from './pages';
-import { buildToday } from './today';
+import { cachedToday, invalidateToday } from './today';
 import { checkKey, ensureSchema, getKv, insertChecks, setKv, summarize } from './store';
 
 export interface Env {
@@ -45,8 +45,8 @@ export async function runChecks(env: Env): Promise<void> {
   const refs = [...new Set(projects.map((p) => p.supabase).filter((r): r is string => !!r))];
 
   const [httpResults, supaResults, github] = await Promise.all([
-    Promise.all(projects.map((p) => (p.url ? checkHttp(p.url, p.okStatus) : Promise.resolve(null)))),
-    Promise.all(refs.map((r) => checkSupabase(r))),
+    Promise.all(projects.map((p) => (p.url ? withRetry(() => checkHttp(p.url!, p.okStatus)) : Promise.resolve(null)))),
+    Promise.all(refs.map((r) => withRetry(() => checkSupabase(r)))),
     fetchGithub(owner, projects, env.GITHUB_TOKEN),
   ]);
   const supaByRef = new Map(refs.map((r, i) => [r, supaResults[i]]));
@@ -183,13 +183,14 @@ async function route(req: Request, env: Env): Promise<Response> {
 
   if (pathname === '/api/overview' && req.method === 'GET') return json(await buildOverview(env));
 
-  if (pathname === '/api/today' && req.method === 'GET') return json(await buildToday(env));
+  if (pathname === '/api/today' && req.method === 'GET') return json(await cachedToday(env, url.searchParams.has('fresh')));
 
   const done = /^\/api\/tasks\/([0-9a-fA-F-]{32,36})\/complete$/.exec(pathname);
   if (done && req.method === 'POST') {
     if (!env.NOTION_TOKEN) return json({ error: '還沒設定 NOTION_TOKEN' }, 503);
     try {
       await completeTask(env.NOTION_TOKEN, done[1]);
+      invalidateToday();
       return json({ ok: true });
     } catch (err) {
       if (err instanceof NotionError) return json({ error: err.message }, 502);
@@ -207,7 +208,17 @@ async function route(req: Request, env: Env): Promise<Response> {
   }
 
   if (isApi) return json({ error: '找不到這個 API' }, 404);
-  return env.ASSETS.fetch(req);
+  const asset = await env.ASSETS.fetch(req);
+  // Vite 產生的 /assets/* 檔名帶內容雜湊，內容變了檔名就變，可以放心長期快取
+  if (pathname.startsWith('/assets/') && asset.ok) {
+    const res = new Response(asset.body, asset);
+    res.headers.set('cache-control', 'private, max-age=31536000, immutable');
+    return res;
+  }
+  // 首頁要登入才看得到，不讓中間的代理伺服器快取
+  const res = new Response(asset.body, asset);
+  res.headers.set('cache-control', 'private, no-cache');
+  return res;
 }
 
 export default {

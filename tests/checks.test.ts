@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildGithubQuery, checkHttp, checkSupabase, fetchDomain, fetchGithub, mapRepo } from '../worker/checks';
+import { buildGithubQuery, checkHttp, checkSupabase, fetchDomain, fetchGithub, mapRepo, withRetry } from '../worker/checks';
 import { deriveHealth, sortByHealth, type HealthInput } from '../worker/health';
 import type { CheckRow, ProjectConfig } from '../shared/types';
 
@@ -187,5 +187,26 @@ describe('deriveHealth', () => {
       deriveHealth(input({ config: proj({ id: 'd' }) })),
     ];
     expect(sortByHealth(list).map((p) => p.config.id)).toEqual(['c', 'a', 'd', 'b']);
+  });
+});
+
+describe('withRetry', () => {
+  const noSleep = async () => {};
+  it('第一次成功就不再試', async () => {
+    let n = 0;
+    const r = await withRetry(async () => (n++, { ok: true, status: 200, ms: 1, error: null }), 0, noSleep);
+    expect(r.ok).toBe(true);
+    expect(n).toBe(1);
+  });
+  it('第一次失敗、第二次成功：算正常', async () => {
+    let n = 0;
+    const r = await withRetry(async () => (n++ === 0 ? { ok: false, status: 503, ms: 1, error: 'HTTP 503' } : { ok: true, status: 200, ms: 1, error: null }), 0, noSleep);
+    expect(r.ok).toBe(true);
+    expect(n).toBe(2);
+  });
+  it('兩次都失敗：算異常，用第二次的結果', async () => {
+    let n = 0;
+    const r = await withRetry(async () => ({ ok: false, status: 500 + n++, ms: 1, error: 'x' }), 0, noSleep);
+    expect(r).toMatchObject({ ok: false, status: 501 });
   });
 });
