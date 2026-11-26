@@ -40,22 +40,12 @@
       "supabase": "nwbfjoroqnhpymdtdbwu"
     },
     {
-      "id": "expense-app",
-      "name": "記帳",
-      "summary": "發票掃描記帳",
-      "repo": "expense-app",
-      "url": null,
-      "host": "vercel",
-      "supabase": "nwbfjoroqnhpymdtdbwu"
-    },
-    {
       "id": "livelyrics",
       "name": "Livelyrics",
       "summary": "演出歌詞視覺",
       "repo": "Livelyrics-",
-      "url": null,
+      "url": "https://livelyrics-omega.vercel.app/",
       "host": "vercel",
-      "okStatus": [401],
       "notes": "https://app.notion.com/p/3e8cbee2351f810cac57f69e4b259b20"
     },
     {
