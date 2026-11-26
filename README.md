@@ -47,7 +47,7 @@
 2. **連 GitHub 自動部署**：Workers & Pages → Create → Import a repository → 選這個 repo。
    - Build command：`npm run build`
    - Deploy command：`npx wrangler deploy`
-3. **設定登入密碼**：Worker 的 Settings → Variables and Secrets → Add，類型選 Secret，名稱 `DASHBOARD_PASSWORD`，至少 12 個字。沒設之前網站只會顯示設定說明，不會露出任何資料。
+3. **設定登入密碼**：Worker 的 Settings → Variables and Secrets → Add，類型選 Secret，名稱 `DASHBOARD_PASSWORD`，至少 6 個字。沒設之前網站只會顯示設定說明，不會露出任何資料。
 4. **GitHub 權杖**：GitHub → Settings → Developer settings → Fine-grained tokens，Repository access 選 All repositories，權限全部唯讀：Contents、Metadata、Pull requests、Commit statuses、Deployments、Actions。到 Worker 的 Settings → Variables and Secrets 新增 Secret `GITHUB_TOKEN`。
 
 ## 登入機制

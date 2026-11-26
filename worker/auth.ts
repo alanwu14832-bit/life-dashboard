@@ -3,7 +3,7 @@
 
 export const COOKIE_NAME = 'ld_session';
 export const SESSION_MS = 30 * 86_400_000;
-export const MIN_PASSWORD_LENGTH = 12;
+export const MIN_PASSWORD_LENGTH = 6;
 export const MAX_FAILURES = 10;
 export const FAILURE_WINDOW_MS = 15 * 60_000;
 
