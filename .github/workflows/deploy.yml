@@ -1,0 +1,40 @@
+# 每次 push 到 main：跑測試、建置，再用 wrangler 部署到 Cloudflare。
+# PR 只跑測試與建置。需要在 GitHub repo 的 Settings → Secrets and variables → Actions 設定：
+#   CLOUDFLARE_API_TOKEN（Cloudflare API 權杖）
+#   CLOUDFLARE_ACCOUNT_ID（Cloudflare 帳號 ID）
+# 還沒設定時會跳過部署，不會讓整個流程失敗。
+name: 測試與部署
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: 測試
+        run: npm test
+      - name: 建置
+        run: npm run build
+      - name: 部署到 Cloudflare
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && env.CLOUDFLARE_API_TOKEN != ''
+        run: npx wrangler deploy
+      - name: 提醒：還沒設定 Cloudflare 權杖
+        if: github.event_name != 'pull_request' && env.CLOUDFLARE_API_TOKEN == ''
+        run: echo "::warning::還沒設定 CLOUDFLARE_API_TOKEN，這次只跑了測試與建置，沒有部署。"

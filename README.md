@@ -44,9 +44,10 @@
 ## 第一次部署（Cloudflare 後台操作）
 
 1. **建 D1 資料庫**：Storage & Databases → D1 SQL Database → Create，名稱 `life-dashboard`。把 Database ID 貼到 `wrangler.jsonc` 的 `database_id`。
-2. **連 GitHub 自動部署**：Workers & Pages → Create → Import a repository → 選這個 repo。
-   - Build command：`npm run build`
-   - Deploy command：`npx wrangler deploy`
+2. **自動部署（GitHub Actions）**：每次 push 到 `main`，`.github/workflows/deploy.yml` 會跑測試、建置、`wrangler deploy`。要先在 GitHub repo 的 Settings → Secrets and variables → Actions 設定：
+   - `CLOUDFLARE_API_TOKEN`：Cloudflare → 右上頭像 → Profile → API Tokens → Create Token → 用「Edit Cloudflare Workers」範本，再加一條 Account › D1 › Edit
+   - `CLOUDFLARE_ACCOUNT_ID`：Workers & Pages 頁面右側的 Account ID
+   - 不用 Cloudflare 內建的 Git 連線（Workers Builds），因為一個 GitHub 帳號只能連一個 Cloudflare 帳號，而校隊的 Cloudflare 帳號也用同一個 GitHub。
 3. **設定登入密碼**：Worker 的 Settings → Variables and Secrets → Add，類型選 Secret，名稱 `DASHBOARD_PASSWORD`，至少 6 個字。沒設之前網站只會顯示設定說明，不會露出任何資料。
 4. **GitHub 權杖**：GitHub → Settings → Developer settings → Fine-grained tokens，Repository access 選 All repositories，權限全部唯讀：Contents、Metadata、Pull requests、Commit statuses、Deployments、Actions。到 Worker 的 Settings → Variables and Secrets 新增 Secret `GITHUB_TOKEN`。
 
