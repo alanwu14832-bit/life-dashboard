@@ -3,6 +3,7 @@ import type { ProjectHistory, ProjectView } from '../../../shared/types';
 import { fetchWithTimeout } from '../../lib/cache';
 import { pct } from '../../lib/format';
 import { LatencyChart } from './LatencyChart';
+import { QuickLinks } from './QuickLinks';
 import { UptimeBars } from './UptimeBars';
 import { span, when } from './util';
 
@@ -34,12 +35,8 @@ export function Detail({ id, project, now }: { id: string; project: ProjectView 
           <h2>{name}</h2>
           {project && <p className="detail-sub">{project.config.summary}</p>}
         </div>
-        {project?.config.url && (
-          <a className="btn-quiet" href={project.config.url} target="_blank" rel="noreferrer">
-            開啟網站
-          </a>
-        )}
       </div>
+      {project && <QuickLinks c={project.config} />}
 
       {error && <p className="banner banner-down">{error}</p>}
       {!hist && !error && <p className="loading">讀取中…</p>}

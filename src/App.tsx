@@ -7,6 +7,7 @@ import { SideNotes } from './components/briefing/SideNotes';
 import { TodayTimeline } from './components/briefing/TodayTimeline';
 import { WeekAhead } from './components/briefing/WeekAhead';
 import { Settings } from './components/settings/Settings';
+import { Weekly } from './components/weekly/Weekly';
 import { ErrorState, PlatformsSkeleton, TodaySkeleton } from './components/States';
 import { useRoute } from './lib/route';
 import { useDashboardData } from './lib/useDashboardData';
@@ -57,6 +58,8 @@ export function App() {
       <div id="main" tabIndex={-1} className="main-anchor">
         {route.name === 'settings' ? (
           <Settings onChanged={d.reloadOverview} />
+        ) : route.name === 'week' ? (
+          <Weekly />
         ) : route.name === 'detail' ? (
           <Detail id={route.id} project={overview?.projects.find((p) => p.config.id === route.id)} now={now} />
         ) : (
@@ -65,7 +68,7 @@ export function App() {
             {today ? (
               <>
                 {d.todayError && <ErrorState message={`${d.todayError}（下面是上一次的資料）`} onRetry={d.reloadToday} />}
-                <TodayTimeline today={today} now={now} onTaskDone={d.completeTask} />
+                <TodayTimeline today={today} now={now} onTaskDone={d.completeTask} onTaskAdd={d.addTask} />
                 <WeekAhead today={today} onTaskDone={d.completeTask} />
               </>
             ) : d.todayError ? (

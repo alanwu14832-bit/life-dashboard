@@ -105,8 +105,24 @@ export function useDashboardData() {
     });
   }, []);
 
+  /** 新增待辦：存進 Notion 後重新讀今天的資料 */
+  const addTask = useCallback(
+    async (title: string, due: string | null) => {
+      const res = await fetchWithTimeout('/api/tasks', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title, due }),
+      });
+      if (handleAuth(res)) return;
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+      await loadToday(true);
+    },
+    [loadToday],
+  );
+
   return {
     overview,
+    addTask,
     today,
     overviewError,
     todayError,

@@ -69,6 +69,9 @@ export function ProjectForm({
         <Field id={fid('ok')} label="也算正常的狀態碼" hint="例如整站密碼保護回 401，就填 401">
           <input id={fid('ok')} value={f.okStatus} onChange={(e) => set('okStatus', e.target.value)} placeholder="401" />
         </Field>
+        <Field id={fid('admin')} label="主機後台網址" hint="Vercel 或 Cloudflare 上這個專案的頁面，詳細頁會放一個按鈕">
+          <input id={fid('admin')} type="url" value={f.adminUrl} onChange={(e) => set('adminUrl', e.target.value)} placeholder="https://vercel.com/…" />
+        </Field>
         <Field id={fid('notes')} label="Notion 筆記連結">
           <input id={fid('notes')} type="url" value={f.notes} onChange={(e) => set('notes', e.target.value)} placeholder="https://app.notion.com/p/…" />
         </Field>

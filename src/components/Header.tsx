@@ -36,8 +36,16 @@ export function Header({ overview, now, onDashboard, refreshing, running, onRunN
         <button type="button" className="text-btn" onClick={onRunNow} disabled={running}>
           {running ? '檢查中…' : '立即檢查'}
         </button>
-        <a className="text-btn" href={onDashboard ? '#settings' : '#'}>
-          {onDashboard ? '設定' : '回控制台'}
+        {!onDashboard && (
+          <a className="text-btn" href="#">
+            回控制台
+          </a>
+        )}
+        <a className="text-btn" href="#week">
+          週報
+        </a>
+        <a className="text-btn" href="#settings">
+          設定
         </a>
         <form method="post" action="/logout" onSubmit={clearCache}>
           <button type="submit" className="text-btn is-quiet">

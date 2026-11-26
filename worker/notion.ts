@@ -73,6 +73,7 @@ function text(p: NotionProp | undefined): string {
 }
 const select = (p: NotionProp | undefined): string | null => (p?.type === 'select' ? (p.select?.name ?? null) : null);
 const date = (p: NotionProp | undefined): string | null => (p?.type === 'date' ? (p.date?.start ?? null) : null);
+const num = (p: NotionProp | undefined): number | null => (p?.type === 'number' && typeof p.number === 'number' ? p.number : null);
 const relation = (p: NotionProp | undefined): string[] =>
   p?.type === 'relation' && Array.isArray(p.relation) ? p.relation.map((r: { id: string }) => r.id) : [];
 const titleOf = (page: Page) => text(Object.values(page.properties).find((p) => p.type === 'title'));
@@ -222,7 +223,22 @@ export async function fetchSchedules(token: string, today: string, now: number, 
       );
       const page = results[0];
       const latestDate = page ? (date(page.properties['日期 Date'])?.slice(0, 10) ?? null) : null;
-      const base = { name: s.name, latestDate, latestTitle: page ? titleOf(page) : null, url: page?.url ?? null };
+      const pr = page?.properties ?? {};
+      const headline = text(pr['今日焦點 Headline']) || null;
+      let figure: string | null = null;
+      let direction: ScheduleStatus['direction'] = null;
+      if (s.source === SOURCES.twClose) {
+        const close = num(pr['收盤指數']);
+        const pct = num(pr['漲跌幅 %']);
+        const dir = select(pr['方向']) ?? '';
+        direction = dir.includes('上漲') ? 'up' : dir.includes('下跌') ? 'down' : dir ? 'flat' : null;
+        if (close !== null)
+          figure = `加權指數 ${close.toLocaleString('en-US', { maximumFractionDigits: 2 })}${pct !== null ? `，${pct > 0 ? '+' : ''}${pct.toFixed(2)}%` : ''}`;
+      } else {
+        const tone = select(pr['市場氛圍 Tone']);
+        if (tone) figure = tone;
+      }
+      const base = { name: s.name, latestDate, latestTitle: page ? titleOf(page) : null, url: page?.url ?? null, headline, figure, direction };
       const dow = weekday(today);
       if (latestDate === today) return { ...base, state: 'ok' as const, note: '今天已寫入' };
       if (dow === 0 || dow === 6) return { ...base, state: 'idle' as const, note: '週末不產出' };
@@ -251,5 +267,51 @@ export async function fetchKnowledge(token: string, f: Fetch = fetch): Promise<K
     type: select(p.properties['類型']),
     created: p.created_time,
     url: p.url,
+  }));
+}
+
+/** 從控制台新增一筆待辦到 ✅ Tasks。due 是 YYYY-MM-DD 或 null。 */
+export async function createTask(token: string, title: string, due: string | null, f: Fetch = fetch): Promise<{ id: string; url: string }> {
+  const t = title.trim();
+  if (!t) throw new NotionError('請輸入待辦內容');
+  if (t.length > 200) throw new NotionError('待辦內容太長了（最多 200 字）');
+  if (due !== null && !/^\d{4}-\d{2}-\d{2}$/.test(due)) throw new NotionError('日期格式不對');
+  const properties: Record<string, unknown> = {
+    [P.title]: { title: [{ text: { content: t } }] },
+    [P.status]: { select: { name: '未開始 Not Started' } },
+  };
+  if (due) properties[P.due] = { date: { start: due } };
+  const page = await call<{ id: string; url: string }>(
+    token,
+    '/pages',
+    { method: 'POST', body: JSON.stringify({ parent: { type: 'data_source_id', data_source_id: SOURCES.tasks }, properties }) },
+    '✅ Tasks 待辦事項',
+    f,
+  );
+  return { id: page.id, url: page.url };
+}
+
+/** 這 7 天內標成完成的待辦（看最後編輯時間）。 */
+export async function fetchDoneThisWeek(token: string, f: Fetch = fetch): Promise<{ title: string; url: string; date: string }[]> {
+  const { results } = await query(
+    token,
+    SOURCES.tasks,
+    {
+      filter: {
+        and: [
+          { property: P.status, select: { equals: P.done } },
+          { timestamp: 'last_edited_time', last_edited_time: { past_week: {} } },
+        ],
+      },
+      sorts: [{ timestamp: 'last_edited_time', direction: 'descending' }],
+      page_size: 100,
+    },
+    '✅ Tasks 待辦事項',
+    f,
+  );
+  return results.map((p) => ({
+    title: text(p.properties[P.title]) || '（無標題）',
+    url: p.url,
+    date: ((p as unknown as { last_edited_time?: string }).last_edited_time ?? p.created_time).slice(0, 10),
   }));
 }

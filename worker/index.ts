@@ -17,7 +17,7 @@ import {
 import { composeMail, ensureIncidents, processSignals, sendMail, type Signal } from './alerts';
 import { checkHttp, checkSupabase, fetchDomain, fetchGithub, withRetry } from './checks';
 import { deriveHealth, sortByHealth } from './health';
-import { completeTask, fetchSchedules, NotionError } from './notion';
+import { completeTask, createTask, fetchSchedules, NotionError } from './notion';
 import { taipeiMinutes, weekday, ymdIn } from './time';
 import { loginPage, setupPage } from './pages';
 import {
@@ -32,6 +32,7 @@ import {
   ValidationError,
 } from './projects';
 import { cachedToday, invalidateToday } from './today';
+import { buildWeekly, composeWeeklyMail } from './weekly';
 import { checkKey, ensureSchema, getKv, insertChecks, projectHistory, setKv, summarize } from './store';
 
 export interface Env {
@@ -47,6 +48,9 @@ export interface Env {
 }
 
 const MIN_MANUAL_GAP_MS = 60_000;
+const PUBLIC_FILES = new Set(['/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/favicon.svg']);
+/** 週日晚上 9 點（台北）寄週報 */
+const WEEKLY_CRON = '0 13 * * SUN';
 const DOMAIN_REFRESH_MS = 86_400_000;
 
 /** 跑一輪全部檢查並寫進資料庫。排程每 30 分鐘呼叫一次，也可以從頁面手動觸發。 */
@@ -245,6 +249,9 @@ async function route(req: Request, env: Env): Promise<Response> {
   }
 
   // 會改資料的請求（POST、PUT、DELETE…）只接受同一個網站送來的
+  // 加到主畫面用的 manifest 與圖示：瀏覽器抓它們時不帶登入 cookie，內容也沒有個人資料
+  if (PUBLIC_FILES.has(pathname) && (req.method === 'GET' || req.method === 'HEAD')) return env.ASSETS.fetch(req);
+
   if (req.method !== 'GET' && req.method !== 'HEAD' && !sameOrigin(req)) return json({ error: '拒絕來自其他網站的請求' }, 403);
 
   if (pathname === '/login') {
@@ -259,6 +266,25 @@ async function route(req: Request, env: Env): Promise<Response> {
   }
 
   if (pathname === '/api/overview' && req.method === 'GET') return json(await buildOverview(env));
+
+  if (pathname === '/api/tasks' && req.method === 'POST') {
+    if (!env.NOTION_TOKEN) return json({ error: '還沒設定 NOTION_TOKEN' }, 503);
+    try {
+      const body = (await req.json()) as { title?: unknown; due?: unknown };
+      const created = await createTask(env.NOTION_TOKEN, String(body.title ?? ''), typeof body.due === 'string' ? body.due : null);
+      invalidateToday();
+      return json(created, 201);
+    } catch (err) {
+      if (err instanceof NotionError || err instanceof SyntaxError) return json({ error: err.message }, 400);
+      throw err;
+    }
+  }
+
+  if (pathname === '/api/weekly' && req.method === 'GET') {
+    await ensureSchema(env.DB);
+    await ensureIncidents(env.DB);
+    return json(await buildWeekly(env));
+  }
 
   if (pathname === '/api/today' && req.method === 'GET') return json(await cachedToday(env, url.searchParams.has('fresh')));
 
@@ -377,7 +403,19 @@ export default {
     }
   },
 
-  async scheduled(_event, env, ctx): Promise<void> {
+  async scheduled(event, env, ctx): Promise<void> {
+    if (event.cron === WEEKLY_CRON) {
+      ctx.waitUntil(
+        (async () => {
+          await ensureSchema(env.DB);
+          await ensureIncidents(env.DB);
+          const mail = composeWeeklyMail(await buildWeekly(env), env.SITE_URL ?? '');
+          const sent = await sendMail(env, mail);
+          await setKv(env.DB, 'notifyLast', { ts: Date.now(), subject: mail.subject, ...sent }, Date.now());
+        })(),
+      );
+      return;
+    }
     ctx.waitUntil(runChecks(env));
   },
 } satisfies ExportedHandler<Env>;

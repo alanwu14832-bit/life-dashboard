@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { completeTask, fetchKnowledge, fetchPlatformCounts, fetchSchedules, fetchTasks, SOURCES } from '../worker/notion';
 import { buildToday } from '../worker/today';
 
@@ -182,6 +182,13 @@ describe('知識庫', () => {
       { title: '個人儀表板決策', topic: '技術與工具', type: '決策記錄', created: '2026-11-26T05:00:00.000Z', url: 'https://www.notion.so/k' },
     ]);
     expect(calls[0].body).toMatchObject({ filter: { timestamp: 'created_time', created_time: { past_week: {} } } });
+  });
+});
+
+// 測試裡不連外網：沒傳 fetch 的地方（例如天氣）一律立刻失敗
+beforeAll(() => {
+  vi.stubGlobal('fetch', async () => {
+    throw new TypeError('offline in tests');
   });
 });
 

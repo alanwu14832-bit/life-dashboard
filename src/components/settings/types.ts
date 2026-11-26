@@ -11,6 +11,7 @@ export interface StoredProject {
   domain?: string;
   okStatus?: number[];
   notes?: string;
+  adminUrl?: string;
   paused: boolean;
 }
 
@@ -25,11 +26,12 @@ export interface FormState {
   domain: string;
   okStatus: string;
   notes: string;
+  adminUrl: string;
   paused: boolean;
 }
 
 export const EMPTY: FormState = {
-  id: '', name: '', summary: '', repo: '', url: '', host: 'vercel', supabase: '', domain: '', okStatus: '', notes: '', paused: false,
+  id: '', name: '', summary: '', repo: '', url: '', host: 'vercel', supabase: '', domain: '', okStatus: '', notes: '', adminUrl: '', paused: false,
 };
 
 export const toForm = (p: StoredProject): FormState => ({
@@ -43,6 +45,7 @@ export const toForm = (p: StoredProject): FormState => ({
   domain: p.domain ?? '',
   okStatus: (p.okStatus ?? []).join(', '),
   notes: p.notes ?? '',
+  adminUrl: p.adminUrl ?? '',
   paused: p.paused,
 });
 

@@ -170,3 +170,32 @@ export async function fetchDomain(domain: string, f: Fetch = fetch): Promise<Dom
     return { domain, expires: null, error: describe(err) };
   }
 }
+
+/** 每個 repo 預設分支從 since（ISO）起的 commit 數。一次 GraphQL 查完。 */
+export async function fetchCommitsSince(
+  owner: string,
+  repos: { id: string; repo: string }[],
+  since: string,
+  token: string | undefined,
+  f: Fetch = fetch,
+): Promise<Record<string, number | null>> {
+  const empty = Object.fromEntries(repos.map((r) => [r.id, null]));
+  if (!token || !repos.length) return empty;
+  const parts = repos.map(
+    (r, i) =>
+      `  r${i}: repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(r.repo)}) { defaultBranchRef { target { ... on Commit { history(since: ${JSON.stringify(since)}) { totalCount } } } } }`,
+  );
+  try {
+    const res = await f('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'user-agent': UA },
+      body: JSON.stringify({ query: `query {\n${parts.join('\n')}\n}` }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) return empty;
+    const json = (await res.json()) as { data?: Record<string, { defaultBranchRef: { target: { history?: { totalCount: number } } } | null } | null> };
+    return Object.fromEntries(repos.map((r, i) => [r.id, json.data?.[`r${i}`]?.defaultBranchRef?.target?.history?.totalCount ?? null]));
+  } catch {
+    return empty;
+  }
+}

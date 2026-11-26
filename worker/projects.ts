@@ -100,6 +100,7 @@ export function validateProject(input: unknown): StoredProject {
     if (okStatus.some((n) => !Number.isInteger(n) || n < 100 || n > 599)) throw new ValidationError('允許的狀態碼要是 100～599 的數字');
   }
 
+  const adminUrl = httpsUrl(optionalString(o.adminUrl, '主機後台網址', 500), '主機後台網址');
   const notes = httpsUrl(optionalString(o.notes, 'Notion 筆記連結', 500), 'Notion 筆記連結');
   if (notes && !/(^|\.)notion\.(so|site|com)$/.test(new URL(notes).hostname))
     throw new ValidationError('筆記連結要是 Notion 的網址');
@@ -115,6 +116,7 @@ export function validateProject(input: unknown): StoredProject {
     ...(domain ? { domain } : {}),
     ...(okStatus ? { okStatus } : {}),
     ...(notes ? { notes } : {}),
+    ...(adminUrl ? { adminUrl } : {}),
     paused: o.paused === true,
   };
 }

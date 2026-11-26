@@ -322,3 +322,49 @@ a.mini-title:hover { color: var(--accent); }
   .two { grid-template-columns: 1fr; gap: var(--s-6); }
   .top-actions { gap: var(--s-3); }
 }
+
+/* ── 刊頭：天氣與市場 ── */
+.mast-row { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--s-2) var(--s-4); flex-wrap: wrap; }
+.mast-weather { margin: 0; display: flex; align-items: baseline; gap: var(--s-2); color: var(--muted); font-size: 13px; padding-bottom: 6px; }
+.mast-weather .num { font-size: 22px; color: var(--ink); }
+.mast-market { margin: 0; display: flex; flex-direction: column; gap: var(--s-1); padding-top: var(--s-3); border-top: 1px solid var(--line); }
+.mkt { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: var(--s-4); align-items: baseline; }
+.mkt dt { font-size: 12px; letter-spacing: 0.08em; color: var(--muted); }
+.mkt-date { letter-spacing: 0; }
+.mkt dd { margin: 0; font: 500 15px/1.6 var(--serif); min-width: 0; }
+.mkt dd a { color: var(--ink); }
+.mkt dd a:hover { color: var(--accent); }
+/* 台股慣例：紅漲綠跌 */
+.mkt dd a.dir-up { color: var(--down); }
+.mkt dd a.dir-down { color: var(--ok); }
+
+/* ── 快速新增待辦 ── */
+.qa { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; padding: var(--s-3) 0; border-bottom: 1px solid var(--line); }
+.qa-input {
+  flex: 1;
+  min-width: 180px;
+  font: 15px/1.5 var(--sans);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed var(--line);
+  padding: 6px 0;
+}
+.qa-input::placeholder { color: var(--muted); }
+.qa-input:focus { outline: none; border-bottom: 1px solid var(--accent); }
+.qa-due { font: 13px/1.4 var(--sans); color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 2px; padding: 5px 8px; }
+.qa-msg { flex-basis: 100%; font-size: 12px; color: var(--ok); }
+.qa-msg.is-error { color: var(--down); }
+
+/* ── 詳細頁：後台入口 ── */
+.qlinks { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); margin-top: calc(-1 * var(--s-5)); }
+.qlink { font-size: 14px; font-weight: 500; letter-spacing: 0.02em; display: inline-flex; gap: var(--s-1); }
+.qlink span { font-size: 11px; color: var(--muted); }
+
+/* ── 週報的平台列：名稱、commit、可用率 ── */
+.plat.wk { grid-template-columns: minmax(0, 1fr) 96px 64px; }
+
+@media (max-width: 560px) {
+  .mkt { grid-template-columns: 56px minmax(0, 1fr); gap: var(--s-3); }
+  .plat.wk { grid-template-columns: minmax(0, 1fr) auto auto; }
+}

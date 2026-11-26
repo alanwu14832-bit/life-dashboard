@@ -4,6 +4,7 @@ import type { CalendarEvent, Section, Today } from '../shared/types';
 import { eventsFromIcs } from './ics';
 import { fetchKnowledge, fetchPlatformCounts, fetchSchedules, fetchTasks } from './notion';
 import { ymdIn } from './time';
+import { fetchWeather } from './weather';
 
 export interface TodayEnv {
   NOTION_TOKEN?: string;
@@ -45,7 +46,7 @@ export async function buildToday(env: TodayEnv, now = Date.now(), f: Fetch = fet
   const token = env.NOTION_TOKEN;
   const noNotion = '還沒設定 NOTION_TOKEN';
 
-  const [tasks, platformTasks, schedules, knowledge, calendar] = await Promise.all([
+  const [tasks, platformTasks, schedules, knowledge, calendar, weather] = await Promise.all([
     token ? settle(() => fetchTasks(token, date, f)) : missing<never>(noNotion),
     token ? settle(() => fetchPlatformCounts(token, f)) : missing<never>(noNotion),
     token ? settle(() => fetchSchedules(token, date, now, f)) : missing<never>(noNotion),
@@ -53,9 +54,10 @@ export async function buildToday(env: TodayEnv, now = Date.now(), f: Fetch = fet
     env.CALENDAR_ICS_URL
       ? settle(() => calendarEvents(env.CALENDAR_ICS_URL!, date, f))
       : missing<never>('還沒設定 CALENDAR_ICS_URL'),
+    settle(() => fetchWeather(f, now)),
   ]);
 
-  return { date, tasks, platformTasks, calendar, schedules, knowledge };
+  return { date, tasks, platformTasks, calendar, schedules, knowledge, weather };
 }
 
 // 整個今天區塊在同一個 Worker 執行個體裡快取 60 秒；勾選完成後清掉

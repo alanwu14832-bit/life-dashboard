@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { CalendarEvent, TaskItem, Today } from '../../../shared/types';
+import { QuickAdd } from './QuickAdd';
 import { TaskCheck } from './TaskCheck';
 import { hm, onDay } from './time';
 
@@ -10,7 +11,7 @@ type Line =
   | { kind: 'task'; key: number; task: TaskItem };
 
 /** 今天：行程與今天到期的待辦併成一條時間線；逾期的接在最後。 */
-export function TodayTimeline({ today, now, onTaskDone }: { today: Today; now: number; onTaskDone: (id: string) => Promise<void> }) {
+export function TodayTimeline({ today, now, onTaskDone, onTaskAdd }: { today: Today; now: number; onTaskDone: (id: string) => Promise<void>; onTaskAdd: (title: string, due: string | null) => Promise<void> }) {
   const [showAll, setShowAll] = useState(false);
   const events = today.calendar.data ? onDay(today.calendar.data, today.date) : [];
   const tasks = today.tasks.data ?? [];
@@ -26,6 +27,7 @@ export function TodayTimeline({ today, now, onTaskDone }: { today: Today; now: n
   return (
     <section className="sec" aria-labelledby="sec-today">
       <h2 id="sec-today" className="sec-title">今天</h2>
+      {!today.tasks.error && <QuickAdd today={today.date} onAdd={onTaskAdd} />}
       {today.calendar.error && <p className="sec-problem">行事曆：{today.calendar.error}</p>}
       {today.tasks.error && <p className="sec-problem">待辦：{today.tasks.error}</p>}
       {lines.length === 0 && overdue.length === 0 && !today.calendar.error && !today.tasks.error && (

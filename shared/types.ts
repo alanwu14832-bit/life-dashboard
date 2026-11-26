@@ -17,6 +17,8 @@ export interface ProjectConfig {
   okStatus?: number[];
   /** 相關的 Notion 筆記 */
   notes?: string;
+  /** 主機後台網址（沒填時依主機給預設） */
+  adminUrl?: string;
 }
 
 export interface Registry {
@@ -125,6 +127,22 @@ export interface ScheduleStatus {
   latestDate: string | null;
   latestTitle: string | null;
   url: string | null;
+  /** 最新一筆的「今日焦點」 */
+  headline: string | null;
+  /** 一句話的數字摘要，例如「加權指數 23,456.78，+1.47%」 */
+  figure: string | null;
+  /** 台股方向：up 上漲、down 下跌、flat 平盤 */
+  direction: 'up' | 'down' | 'flat' | null;
+}
+
+export interface Weather {
+  place: string;
+  now: number;
+  high: number;
+  low: number;
+  /** 今天最高降雨機率（%） */
+  rain: number | null;
+  label: string;
 }
 
 export interface KnowledgeItem {
@@ -147,6 +165,19 @@ export interface Today {
   calendar: Section<CalendarEvent[]>;
   schedules: Section<ScheduleStatus[]>;
   knowledge: Section<KnowledgeItem[]>;
+  weather: Section<Weather>;
+}
+
+// ── 每週回顧 ──────────────────────────────────────────
+
+export interface Weekly {
+  /** 這一週的範圍（台北日期，含頭尾） */
+  from: string;
+  to: string;
+  done: Section<{ title: string; url: string; date: string }[]>;
+  platforms: { id: string; name: string; uptime: number | null; commits: number | null; incidents: number }[];
+  notes: Section<{ title: string; url: string }[]>;
+  nextWeek: Section<{ events: number; tasks: number }>;
 }
 
 // ── 單一平台詳細頁 ──────────────────────────────────────────

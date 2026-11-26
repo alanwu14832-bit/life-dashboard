@@ -1,0 +1,15 @@
+{
+  "name": "專案控制台",
+  "short_name": "控制台",
+  "description": "每日簡報：行程、待辦、平台狀態",
+  "lang": "zh-Hant-TW",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ebeae6",
+  "theme_color": "#ebeae6",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
