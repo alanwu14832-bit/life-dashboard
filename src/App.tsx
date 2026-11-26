@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Health, Overview, ProjectView } from '../shared/types';
+import type { Health, Overview, ProjectView, Today } from '../shared/types';
 import { ago, clock, hostLabel, ms, pct, today } from './format';
+import { TodayPanel } from './Today';
 
 const POLL_MS = 5 * 60_000;
 const OWNER = 'alanwu14832-bit';
-const NOTION_HOME = 'https://app.notion.com/p/3c7cbee2351f817b8dbbec370a46a836';
-const CALENDAR_DAY = 'https://calendar.google.com/calendar/r/day';
 
 const HEALTH_LABEL: Record<Health, string> = { down: '異常', warn: '注意', unknown: '未設定', ok: '正常' };
 
@@ -14,6 +13,35 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [todayData, setTodayData] = useState<Today | null>(null);
+
+  const loadToday = useCallback(async () => {
+    try {
+      const res = await fetch('/api/today');
+      if (res.status === 401) return location.reload();
+      if (res.ok) setTodayData((await res.json()) as Today);
+    } catch {
+      // 今天區塊讀不到時保留上一次的內容
+    }
+  }, []);
+
+  // 勾選完成：寫回 Notion 成功後才從清單拿掉
+  const completeTask = useCallback(async (id: string) => {
+    const res = await fetch(`/api/tasks/${id}/complete`, { method: 'POST' });
+    if (res.status === 401) return location.reload();
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+    setTodayData((t) => {
+      if (!t?.tasks.data) return t;
+      const task = t.tasks.data.find((x) => x.id === id);
+      const counts = { ...(t.platformTasks.data ?? {}) };
+      if (task?.platform && counts[task.platform]) counts[task.platform] -= 1;
+      return {
+        ...t,
+        tasks: { ...t.tasks, data: t.tasks.data.filter((x) => x.id !== id) },
+        platformTasks: t.platformTasks.data ? { ...t.platformTasks, data: counts } : t.platformTasks,
+      };
+    });
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -30,7 +58,11 @@ export function App() {
 
   useEffect(() => {
     load();
-    const poll = setInterval(load, POLL_MS);
+    loadToday();
+    const poll = setInterval(() => {
+      load();
+      loadToday();
+    }, POLL_MS);
     const tick = setInterval(() => setNow(Date.now()), 30_000);
     return () => {
       clearInterval(poll);
@@ -108,27 +140,14 @@ export function App() {
       </section>
 
       <div className="layout">
-        <aside className="today" aria-label="今天">
-          <h2>今天</h2>
-          <p className="today-note">第二階段會在這裡列出今天的行程、到期待辦和排程狀態。在那之前先從這兩個入口看：</p>
-          <ul className="today-links">
-            <li>
-              <a href={NOTION_HOME} target="_blank" rel="noreferrer">
-                Notion 首頁<span>到期待辦、晨間簡報、台股收盤</span>
-              </a>
-            </li>
-            <li>
-              <a href={CALENDAR_DAY} target="_blank" rel="noreferrer">
-                Google 行事曆<span>今天的課與行程</span>
-              </a>
-            </li>
-          </ul>
-        </aside>
+        <TodayPanel today={todayData} now={now} onTaskDone={completeTask} />
 
         <main className="projects" aria-label="平台">
           <h2 className="sr-only">平台</h2>
           {!data && !error && <p className="loading">讀取中…</p>}
-          {data?.projects.map((p) => <ProjectCard key={p.config.id} p={p} now={now} />)}
+          {data?.projects.map((p) => (
+            <ProjectCard key={p.config.id} p={p} now={now} openTasks={todayData?.platformTasks.data?.[p.config.name] ?? 0} />
+          ))}
         </main>
       </div>
 
@@ -139,7 +158,7 @@ export function App() {
   );
 }
 
-function ProjectCard({ p, now }: { p: ProjectView; now: number }) {
+function ProjectCard({ p, now, openTasks }: { p: ProjectView; now: number; openTasks: number }) {
   const { config, repo } = p;
   const latest = p.http.latest;
   return (
@@ -186,6 +205,7 @@ function ProjectCard({ p, now }: { p: ProjectView; now: number }) {
           <span className="chip">{hostLabel(config.host)}</span>
           {repo?.private && <span className="chip">私有</span>}
           {p.stale && <span className="chip chip-stale">停滯 30 天以上</span>}
+          {openTasks > 0 && <span className="chip chip-tasks">{openTasks} 件待辦</span>}
           {repo && repo.openPRs > 0 && <span className="chip">{repo.openPRs} 個 PR 未合併</span>}
         </div>
         <nav className="links" aria-label={`${config.name} 連結`}>

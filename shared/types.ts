@@ -91,3 +91,60 @@ export interface Overview {
   github: { ts: number; error: string | null } | null;
   projects: ProjectView[];
 }
+
+// ── 第二階段：今天 ──────────────────────────────────────────
+
+export interface TaskItem {
+  id: string;
+  title: string;
+  url: string;
+  due: string | null;
+  status: string | null;
+  priority: string | null;
+  type: string | null;
+  platform: string | null;
+  courses: string[];
+  /** overdue＝逾期、today＝今天到期、soon＝7 天內 */
+  bucket: 'overdue' | 'today' | 'soon';
+}
+
+export interface CalendarEvent {
+  title: string;
+  location: string | null;
+  allDay: boolean;
+  /** 整天的行程是 YYYY-MM-DD（結束日不含）；有時間的是 ISO 時間 */
+  start: string;
+  end: string;
+}
+
+export interface ScheduleStatus {
+  name: string;
+  /** ok＝今天已寫入、late＝該寫了但還沒有、idle＝今天本來就不用寫或還沒到時間 */
+  state: 'ok' | 'late' | 'idle';
+  note: string;
+  latestDate: string | null;
+  latestTitle: string | null;
+  url: string | null;
+}
+
+export interface KnowledgeItem {
+  title: string;
+  topic: string | null;
+  type: string | null;
+  created: string;
+  url: string;
+}
+
+export interface Section<T> {
+  data: T | null;
+  error: string | null;
+}
+
+export interface Today {
+  date: string;
+  tasks: Section<TaskItem[]>;
+  platformTasks: Section<Record<string, number>>;
+  calendar: Section<CalendarEvent[]>;
+  schedules: Section<ScheduleStatus[]>;
+  knowledge: Section<KnowledgeItem[]>;
+}

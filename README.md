@@ -1,6 +1,11 @@
 # 專案控制台
 
-一頁看完所有 vibe coding 平台的狀態：網站是否打得開、回應時間、24 小時與 7 天可用率、Supabase 是否被暫停、最後 commit、最近部署、未合併的 PR。之後會再接上 Notion 待辦與 Google 行事曆（第二階段）。
+一頁看完所有 vibe coding 平台的狀態，加上今天的行程與待辦：
+
+- **平台**：網站是否打得開、回應時間、24 小時與 7 天可用率、Supabase 是否被暫停、最後 commit、最近部署、未合併的 PR、還有幾件待辦。
+- **今天**：Google 行事曆今天與明天的行程、Notion 逾期／今天／7 天內的待辦（可直接勾選完成）、晨間簡報與台股收盤排程有沒有寫入、知識庫最近 7 天的筆記。
+
+Notion 和 Google 行事曆仍是唯一的輸入處，這裡只負責看，以及把待辦標成完成。
 
 ## 架構
 
@@ -50,6 +55,17 @@
    - 不用 Cloudflare 內建的 Git 連線（Workers Builds），因為一個 GitHub 帳號只能連一個 Cloudflare 帳號，而校隊的 Cloudflare 帳號也用同一個 GitHub。
 3. **設定登入密碼**：Worker 的 Settings → Variables and Secrets → Add，類型選 Secret，名稱 `DASHBOARD_PASSWORD`，至少 6 個字。沒設之前網站只會顯示設定說明，不會露出任何資料。
 4. **GitHub 權杖**：GitHub → Settings → Developer settings → Fine-grained tokens，Repository access 選 All repositories，權限全部唯讀：Contents、Metadata、Pull requests、Commit statuses、Deployments、Actions。到 Worker 的 Settings → Variables and Secrets 新增 Secret `GITHUB_TOKEN`。
+
+## 第二階段設定：Notion 與行事曆
+
+兩個都存成 Worker 的 **Secret**（Settings → Variables and Secrets），不用重新部署。
+
+- `NOTION_TOKEN`：notion.so/profile/integrations 建一個 Internal integration，權限勾 Read content 與 Update content，複製 Internal Integration Secret。再到這幾個資料庫右上角 ⋯ → Connections 把 integration 加進去：✅ Tasks 待辦事項、📊 晨間簡報、🇹🇼 台股收盤、🧠 Claude 知識庫，以及（選用，用來顯示課名）📚 Courses。
+- `CALENDAR_ICS_URL`：Google 行事曆 → 設定 → 你的行事曆 → 整合日曆 → 「iCal 格式的私人網址」。
+
+待辦的「平台 Platform」欄位選項要和 `projects.json` 的 `name` 一樣，卡片才會顯示待辦數。
+
+行事曆解析是自己寫的輕量版本（`worker/ics.ts`），支援每天／每週／每月／每年重複、停課（EXDATE）、單次改時間（RECURRENCE-ID）與時區；解析結果快取 5 分鐘，以免超過免費方案每次 10ms 的 CPU 上限。
 
 ## 登入機制
 

@@ -17,7 +17,9 @@ import {
 } from './auth';
 import { checkHttp, checkSupabase, fetchDomain, fetchGithub } from './checks';
 import { deriveHealth, sortByHealth } from './health';
+import { completeTask, NotionError } from './notion';
 import { loginPage, setupPage } from './pages';
+import { buildToday } from './today';
 import { checkKey, ensureSchema, getKv, insertChecks, setKv, summarize } from './store';
 
 export interface Env {
@@ -25,6 +27,8 @@ export interface Env {
   ASSETS: Fetcher;
   GITHUB_TOKEN?: string;
   DASHBOARD_PASSWORD?: string;
+  NOTION_TOKEN?: string;
+  CALENDAR_ICS_URL?: string;
 }
 
 const registry = registryJson as Registry;
@@ -178,6 +182,20 @@ async function route(req: Request, env: Env): Promise<Response> {
   }
 
   if (pathname === '/api/overview' && req.method === 'GET') return json(await buildOverview(env));
+
+  if (pathname === '/api/today' && req.method === 'GET') return json(await buildToday(env));
+
+  const done = /^\/api\/tasks\/([0-9a-fA-F-]{32,36})\/complete$/.exec(pathname);
+  if (done && req.method === 'POST') {
+    if (!env.NOTION_TOKEN) return json({ error: '還沒設定 NOTION_TOKEN' }, 503);
+    try {
+      await completeTask(env.NOTION_TOKEN, done[1]);
+      return json({ ok: true });
+    } catch (err) {
+      if (err instanceof NotionError) return json({ error: err.message }, 502);
+      throw err;
+    }
+  }
 
   if (pathname === '/api/run' && req.method === 'POST') {
     await ensureSchema(env.DB);

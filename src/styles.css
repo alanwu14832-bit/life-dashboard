@@ -156,7 +156,7 @@ code { font-family: var(--font-mono); font-size: 0.92em; }
 /* 主版面 */
 .layout {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 320px minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -168,23 +168,62 @@ code { font-family: var(--font-mono); font-size: 0.92em; }
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   position: sticky;
   top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
 }
 .today h2 { font-size: 16px; font-weight: 600; }
 .today-note { margin: 0; color: var(--muted); font-size: 13px; }
-.today-links { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.today-links a {
-  display: flex;
-  flex-direction: column;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--surface-2);
-  font-weight: 500;
-}
-.today-links a span { color: var(--muted); font-size: 12px; font-weight: 400; }
-.today-links a:hover { text-decoration: none; background: var(--line); }
+
+/* 今天：行程／待辦／排程／知識庫，各一塊，用細線分隔 */
+.block { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
+.block-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.block-head h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0.04em; }
+.block-head a { font-size: 12px; }
+.block-problem { margin: 0; font-size: 13px; color: var(--warn); display: flex; flex-direction: column; gap: 2px; }
+.block-problem span { color: var(--muted); }
+.empty { margin: 0; font-size: 13px; color: var(--muted); }
+.sub { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+
+.events, .tasks, .schedules, .notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.events li { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.ev-time { font-size: 13px; color: var(--muted); }
+.ev-body { display: flex; flex-direction: column; min-width: 0; }
+.ev-title { font-size: 14px; overflow-wrap: anywhere; }
+.ev-meta { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.events li.is-past { opacity: 0.5; }
+.events li.is-live .ev-time { color: var(--accent); font-weight: 500; }
+.events li.is-live .ev-title { font-weight: 500; }
+
+.task-group.g-overdue .sub { color: var(--down); }
+.task-group.g-today .sub { color: var(--warn); }
+.tasks li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; align-items: start; }
+.tasks input { margin: 3px 0 0; width: 16px; height: 16px; accent-color: var(--ok); cursor: pointer; }
+.tasks li.is-saving { opacity: 0.5; }
+.task-body { display: flex; flex-direction: column; min-width: 0; }
+.task-title { color: var(--ink); font-size: 14px; overflow-wrap: anywhere; }
+.task-title:hover { color: var(--accent); }
+.task-meta { font-size: 12px; color: var(--muted); }
+.task-error { font-size: 12px; color: var(--down); }
+
+.schedules li { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.schedules .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--unknown); }
+.schedules .s-ok .dot { background: var(--ok); }
+.schedules .s-late .dot { background: var(--warn); }
+.sch-body { display: flex; flex-direction: column; min-width: 0; }
+.sch-name { font-size: 14px; }
+.sch-name a { color: var(--ink); }
+.sch-note { font-size: 12px; color: var(--muted); }
+.schedules .s-late .sch-note { color: var(--warn); }
+
+.notes li { display: flex; flex-direction: column; min-width: 0; }
+.notes a { font-size: 14px; color: var(--ink); overflow-wrap: anywhere; }
+.notes a:hover { color: var(--accent); }
+.note-meta { font-size: 12px; color: var(--muted); }
+
+.chip-tasks { color: var(--accent); border-color: var(--accent); background: transparent; }
 
 .projects {
   display: grid;
