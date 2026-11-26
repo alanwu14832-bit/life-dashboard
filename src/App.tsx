@@ -141,24 +141,14 @@ export function App() {
         <p className="banner banner-muted">GitHub 資料沒更新：{data.github.error}</p>
       )}
 
-      <section className="summary" aria-label="總覽">
-        {(['down', 'warn', 'ok', 'unknown'] as Health[]).map((h) => (
-          <div key={h} className={`summary-item h-${h}${counts[h] === 0 ? ' is-zero' : ''}`}>
-            <span className="summary-n num">{data ? counts[h] : '–'}</span>
-            <span className="summary-label">{HEALTH_LABEL[h]}</span>
-          </div>
-        ))}
-      </section>
+      <Summary data={data} today={todayData} counts={counts} now={now} />
 
       <div className="layout">
         <TodayPanel today={todayData} now={now} onTaskDone={completeTask} />
 
-        <main className="projects" aria-label="平台">
-          <h2 className="sr-only">平台</h2>
+        <main className="platforms" aria-label="平台">
           {!data && !error && <p className="loading">讀取中…</p>}
-          {data?.projects.map((p) => (
-            <ProjectCard key={p.config.id} p={p} now={now} openTasks={todayData?.platformTasks.data?.[p.config.name] ?? 0} />
-          ))}
+          {data && <Platforms projects={data.projects} now={now} taskCounts={todayData?.platformTasks.data ?? {}} />}
         </main>
       </div>
 
@@ -169,7 +159,116 @@ export function App() {
   );
 }
 
-function ProjectCard({ p, now, openTasks }: { p: ProjectView; now: number; openTasks: number }) {
+/** 一句話總結：平台狀況、今天到期幾件、下一個行程。 */
+function Summary({ data, today, counts, now }: { data: Overview | null; today: Today | null; counts: Record<Health, number>; now: number }) {
+  if (!data) return null;
+  const total = data.projects.length;
+  const issues = counts.down + counts.warn;
+  const dueToday = today?.tasks.data?.filter((t) => t.bucket !== 'soon').length ?? null;
+  const overdue = today?.tasks.data?.filter((t) => t.bucket === 'overdue').length ?? 0;
+  const next = today?.calendar.data?.find((e) => !e.allDay && Date.parse(e.end) > now);
+  const nextToday = next && new Date(next.start).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }) === today?.date;
+
+  return (
+    <section className="summary-line" aria-label="總覽">
+      <span className={`seg ${counts.down ? 't-down' : issues ? 't-warn' : 't-ok'}`}>
+        <span className="seg-dot" aria-hidden="true" />
+        {counts.down
+          ? `${counts.down} 個平台異常`
+          : counts.warn
+            ? `${counts.warn} 個平台要注意`
+            : `${total - counts.unknown} 個平台都正常`}
+      </span>
+      {dueToday !== null && (
+        <span className={`seg ${overdue ? 't-warn' : ''}`}>
+          {dueToday - overdue > 0 ? `今天 ${dueToday - overdue} 件到期` : '今天沒有到期的待辦'}
+          {overdue > 0 && `，${overdue} 件逾期`}
+        </span>
+      )}
+      {today?.calendar.data && (
+        <span className="seg">
+          {next && nextToday
+            ? `下一個行程 ${clock(Date.parse(next.start))} ${next.title}`
+            : '今天沒有其他行程'}
+        </span>
+      )}
+    </section>
+  );
+}
+
+function Platforms({ projects, now, taskCounts }: { projects: ProjectView[]; now: number; taskCounts: Record<string, number> }) {
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const attention = projects.filter((p) => p.health === 'down' || p.health === 'warn');
+  const rest = projects.filter((p) => p.health !== 'down' && p.health !== 'warn');
+  const toggle = (id: string) => setOpen((o) => ({ ...o, [id]: !o[id] }));
+
+  return (
+    <>
+      {attention.length > 0 && (
+        <section className="plat-section" aria-label="需要處理">
+          <h2 className="section-title">需要處理</h2>
+          <div className="projects">
+            {attention.map((p) => (
+              <ProjectCard key={p.config.id} p={p} now={now} openTasks={taskCounts[p.config.name] ?? 0} />
+            ))}
+          </div>
+        </section>
+      )}
+      <section className="plat-section" aria-label="平台">
+        <h2 className="section-title">{attention.length ? '其他平台' : '平台'}</h2>
+        <ul className="rows">
+          {rest.map((p) => (
+            <li key={p.config.id}>
+              {open[p.config.id] ? (
+                <div className="row-open">
+                  <ProjectCard p={p} now={now} openTasks={taskCounts[p.config.name] ?? 0} onCollapse={() => toggle(p.config.id)} />
+                </div>
+              ) : (
+                <ProjectRow p={p} now={now} openTasks={taskCounts[p.config.name] ?? 0} onExpand={() => toggle(p.config.id)} />
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
+  );
+}
+
+/** 正常的平台縮成一行：名稱、24 小時紀錄條、回應時間、最後 commit、待辦數。點一下展開。 */
+function ProjectRow({ p, now, openTasks, onExpand }: { p: ProjectView; now: number; openTasks: number; onExpand: () => void }) {
+  const { config, repo } = p;
+  const latest = p.http.latest;
+  return (
+    <div className={`row h-${p.health}`}>
+      <button type="button" className="row-main" onClick={onExpand} aria-expanded="false" aria-label={`展開 ${config.name} 的詳細資料`}>
+        <span className="row-dot" aria-hidden="true" />
+        <span className="row-name">
+          <span className="row-title">{config.name}</span>
+          <span className="row-summary">{config.summary}</span>
+        </span>
+        {config.url ? <Ticks recent={p.http.recent} now={now} compact /> : <span className="row-note">{p.reasons[0]}</span>}
+        <span className="row-stat num">{latest?.ok ? ms(latest.ms) : '—'}</span>
+        <span className="row-stat row-commit">{repo?.commit ? ago(repo.commit.date, now) : '—'}</span>
+        <span className="row-chips">
+          {openTasks > 0 && <span className="chip chip-tasks">{openTasks} 件待辦</span>}
+          {p.stale && <span className="chip chip-stale">停滯</span>}
+        </span>
+      </button>
+      <nav className="row-links" aria-label={`${config.name} 連結`}>
+        {config.url && (
+          <a href={config.url} target="_blank" rel="noreferrer">
+            網站
+          </a>
+        )}
+        <a href={`https://github.com/${OWNER}/${config.repo}`} target="_blank" rel="noreferrer">
+          GitHub
+        </a>
+      </nav>
+    </div>
+  );
+}
+
+function ProjectCard({ p, now, openTasks, onCollapse }: { p: ProjectView; now: number; openTasks: number; onCollapse?: () => void }) {
   const { config, repo } = p;
   const latest = p.http.latest;
   return (
@@ -179,7 +278,14 @@ function ProjectCard({ p, now, openTasks }: { p: ProjectView; now: number; openT
           <h3>{config.name}</h3>
           <span className="card-summary">{config.summary}</span>
         </div>
-        <span className="pill">{HEALTH_LABEL[p.health]}</span>
+        <div className="card-head-right">
+          <span className="pill">{HEALTH_LABEL[p.health]}</span>
+          {onCollapse && (
+            <button type="button" className="btn-quiet btn-small" onClick={onCollapse} aria-label={`收起 ${config.name}`}>
+              收起
+            </button>
+          )}
+        </div>
       </div>
 
       {p.reasons.length > 0 && (
@@ -252,7 +358,7 @@ const SLOTS = 48;
 const SLOT_MS = 30 * 60_000;
 
 /** 最近 24 小時、每 30 分鐘一格。沒有紀錄的格子留空，不假裝是正常。 */
-function Ticks({ recent, now }: { recent: ProjectView['http']['recent']; now: number }) {
+function Ticks({ recent, now, compact = false }: { recent: ProjectView['http']['recent']; now: number; compact?: boolean }) {
   const slots: ('ok' | 'down' | 'none')[] = Array(SLOTS).fill('none');
   for (const r of recent) {
     const idx = SLOTS - 1 - Math.floor((now - r.ts) / SLOT_MS);
@@ -261,16 +367,18 @@ function Ticks({ recent, now }: { recent: ProjectView['http']['recent']; now: nu
   }
   const downs = slots.filter((s) => s === 'down').length;
   return (
-    <div className="ticks-wrap">
+    <div className={compact ? 'ticks-wrap is-compact' : 'ticks-wrap'}>
       <div className="ticks" role="img" aria-label={`最近 24 小時：${downs ? `${downs} 次打不開` : '沒有打不開的紀錄'}`}>
         {slots.map((s, i) => (
           <span key={i} className={`tick tick-${s}`} />
         ))}
       </div>
-      <div className="ticks-axis">
-        <span>24 小時前</span>
-        <span>現在</span>
-      </div>
+      {!compact && (
+        <div className="ticks-axis">
+          <span>24 小時前</span>
+          <span>現在</span>
+        </div>
+      )}
     </div>
   );
 }
