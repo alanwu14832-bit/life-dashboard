@@ -16,7 +16,7 @@ Notion 和 Google 行事曆仍是唯一的輸入處，這裡只負責看，以�
 | 排程 | Cron 每 30 分鐘跑一輪檢查（`wrangler.jsonc` 的 `triggers`） |
 | 資料 | Cloudflare D1（SQLite），保留 30 天；第一次用到時自動建表 |
 | 登入 | 一組密碼（Secret `DASHBOARD_PASSWORD`），登入後 30 天內免輸入；沒設密碼時整站不開放 |
-| 專案清單 | `projects.json` |
+| 平台清單 | 存在 D1，在網站右上角「設定」新增、編輯、排序、暫停監控；`projects.json` 只是第一次的預設值 |
 
 檢查內容：
 
@@ -28,23 +28,9 @@ Notion 和 Google 行事曆仍是唯一的輸入處，這裡只負責看，以�
 
 ## 新增或修改平台
 
-編輯 `projects.json`，push 之後 Cloudflare 會自動重新部署。
+到網站右上角「設定」。可以新增、編輯、上下排序、暫停監控（保留設定但不檢查）、刪除（會一併刪掉檢查紀錄）。
 
-```json
-{
-  "id": "my-app",
-  "name": "顯示名稱",
-  "summary": "一句話說明",
-  "repo": "GitHub repo 名稱",
-  "url": "https://my-app.vercel.app/",
-  "host": "vercel",
-  "supabase": "Supabase 專案代號（可省略）",
-  "domain": "自訂網域（可省略）",
-  "notes": "Notion 筆記連結（可省略）"
-}
-```
-
-`host` 是 `vercel`、`cloudflare` 或 `github-pages`。
+`projects.json` 只在資料庫還沒有任何平台時匯入一次，之後改它不會有效果。
 
 ## 第一次部署（Cloudflare 後台操作）
 

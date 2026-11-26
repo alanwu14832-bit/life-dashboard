@@ -2,7 +2,20 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Health, Overview, ProjectView, Today } from '../shared/types';
 import { ago, clock, hostLabel, ms, pct, today } from './format';
 import { clearCache, fetchWithTimeout, readCache, writeCache } from './cache';
+import { Settings } from './Settings';
 import { TodayPanel } from './Today';
+
+/** 用網址 # 切換頁面：#settings 是設定頁，其他都是控制台 */
+function useView(): 'dashboard' | 'settings' {
+  const read = (): 'dashboard' | 'settings' => (location.hash === '#settings' ? 'settings' : 'dashboard');
+  const [view, setView] = useState(read);
+  useEffect(() => {
+    const on = () => setView(read());
+    window.addEventListener('hashchange', on);
+    return () => window.removeEventListener('hashchange', on);
+  }, []);
+  return view;
+}
 
 const POLL_MS = 5 * 60_000;
 const OWNER = 'alanwu14832-bit';
@@ -17,6 +30,7 @@ export function App() {
   const [now, setNow] = useState(Date.now());
   const [todayData, setTodayData] = useState<Today | null>(() => readCache<Today>('today')?.data ?? null);
   const [refreshing, setRefreshing] = useState(true);
+  const view = useView();
 
   const loadToday = useCallback(async () => {
     try {
@@ -118,6 +132,9 @@ export function App() {
               '還沒有檢查紀錄'
             )}
           </span>
+          <a className="btn-quiet nav-link" href={view === 'settings' ? '#' : '#settings'}>
+            {view === 'settings' ? '回控制台' : '設定'}
+          </a>
           <button type="button" className="btn" onClick={runNow} disabled={running}>
             {running ? '檢查中…' : '立即檢查'}
           </button>
@@ -141,19 +158,25 @@ export function App() {
         <p className="banner banner-muted">GitHub 資料沒更新：{data.github.error}</p>
       )}
 
-      <Summary data={data} today={todayData} counts={counts} now={now} />
+      {view === 'settings' ? (
+        <Settings onChanged={load} />
+      ) : (
+        <>
+        <Summary data={data} today={todayData} counts={counts} now={now} />
 
-      <div className="layout">
-        <TodayPanel today={todayData} now={now} onTaskDone={completeTask} />
+        <div className="layout">
+          <TodayPanel today={todayData} now={now} onTaskDone={completeTask} />
 
-        <main className="platforms" aria-label="平台">
-          {!data && !error && <p className="loading">讀取中…</p>}
-          {data && <Platforms projects={data.projects} now={now} taskCounts={todayData?.platformTasks.data ?? {}} />}
-        </main>
-      </div>
+          <main className="platforms" aria-label="平台">
+            {!data && !error && <p className="loading">讀取中…</p>}
+            {data && <Platforms projects={data.projects} now={now} taskCounts={todayData?.platformTasks.data ?? {}} />}
+          </main>
+        </div>
+        </>
+      )}
 
       <footer className="foot">
-        每 30 分鐘自動檢查一次，資料保留 30 天。新增平台：編輯 repo 裡的 <code>projects.json</code>。
+        每 30 分鐘自動檢查一次，資料保留 30 天。新增或修改平台：右上角「設定」。
       </footer>
     </div>
   );

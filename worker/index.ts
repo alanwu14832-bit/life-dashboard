@@ -1,5 +1,4 @@
-import registryJson from '../projects.json';
-import type { DomainInfo, GithubSnapshot, Overview, Registry } from '../shared/types';
+import type { DomainInfo, GithubSnapshot, Overview } from '../shared/types';
 import {
   clearCookie,
   clearFailures,
@@ -19,6 +18,17 @@ import { checkHttp, checkSupabase, fetchDomain, fetchGithub, withRetry } from '.
 import { deriveHealth, sortByHealth } from './health';
 import { completeTask, NotionError } from './notion';
 import { loginPage, setupPage } from './pages';
+import {
+  activeProjects,
+  createProject,
+  deleteProject,
+  listProjects,
+  OWNER,
+  reorderProjects,
+  updateProject,
+  validateProject,
+  ValidationError,
+} from './projects';
 import { cachedToday, invalidateToday } from './today';
 import { checkKey, ensureSchema, getKv, insertChecks, setKv, summarize } from './store';
 
@@ -31,7 +41,6 @@ export interface Env {
   CALENDAR_ICS_URL?: string;
 }
 
-const registry = registryJson as Registry;
 const MIN_MANUAL_GAP_MS = 60_000;
 const DOMAIN_REFRESH_MS = 86_400_000;
 
@@ -39,7 +48,8 @@ const DOMAIN_REFRESH_MS = 86_400_000;
 export async function runChecks(env: Env): Promise<void> {
   await ensureSchema(env.DB);
   const ts = Date.now();
-  const { projects, owner } = registry;
+  const projects = await activeProjects(env.DB);
+  const owner = OWNER;
 
   // 同一個 Supabase 專案只打一次，結果分給共用它的專案
   const refs = [...new Set(projects.map((p) => p.supabase).filter((r): r is string => !!r))];
@@ -85,7 +95,8 @@ export async function buildOverview(env: Env): Promise<Overview> {
     getKv<{ ts: number; ms: number }>(env.DB, 'lastRun'),
   ]);
 
-  const projects = registry.projects.map((config) => {
+  const configs = await activeProjects(env.DB);
+  const projects = configs.map((config) => {
     const up = summary.uptime.get(checkKey(config.id, 'http'));
     return deriveHealth({
       config,
@@ -168,7 +179,8 @@ async function route(req: Request, env: Env): Promise<Response> {
     return isApi ? json({ error: reason }, 503) : html(setupPage(reason), 503);
   }
 
-  if (req.method === 'POST' && !sameOrigin(req)) return json({ error: '拒絕來自其他網站的請求' }, 403);
+  // 會改資料的請求（POST、PUT、DELETE…）只接受同一個網站送來的
+  if (req.method !== 'GET' && req.method !== 'HEAD' && !sameOrigin(req)) return json({ error: '拒絕來自其他網站的請求' }, 403);
 
   if (pathname === '/login') {
     if (req.method === 'POST') return handleLogin(req, env, password);
@@ -205,6 +217,40 @@ async function route(req: Request, env: Env): Promise<Response> {
       return json({ error: '一分鐘內剛檢查過，稍等一下再按' }, 429);
     await runChecks(env);
     return json(await buildOverview(env));
+  }
+
+  // 設定頁：平台清單
+  if (pathname === '/api/projects') {
+    try {
+      if (req.method === 'GET') return json({ owner: OWNER, projects: await listProjects(env.DB) });
+      if (req.method === 'POST') {
+        await createProject(env.DB, validateProject(await req.json()));
+        return json({ owner: OWNER, projects: await listProjects(env.DB) }, 201);
+      }
+    } catch (err) {
+      if (err instanceof ValidationError || err instanceof SyntaxError) return json({ error: err.message }, 400);
+      throw err;
+    }
+  }
+  if (pathname === '/api/projects/order' && req.method === 'POST') {
+    try {
+      await reorderProjects(env.DB, ((await req.json()) as { ids?: unknown }).ids);
+      return json({ owner: OWNER, projects: await listProjects(env.DB) });
+    } catch (err) {
+      if (err instanceof ValidationError || err instanceof SyntaxError) return json({ error: err.message }, 400);
+      throw err;
+    }
+  }
+  const one = /^\/api\/projects\/([a-z0-9][a-z0-9-]{0,39})$/.exec(pathname);
+  if (one && (req.method === 'PUT' || req.method === 'DELETE')) {
+    try {
+      if (req.method === 'PUT') await updateProject(env.DB, one[1], validateProject(await req.json()));
+      else await deleteProject(env.DB, one[1]);
+      return json({ owner: OWNER, projects: await listProjects(env.DB) });
+    } catch (err) {
+      if (err instanceof ValidationError || err instanceof SyntaxError) return json({ error: err.message }, 400);
+      throw err;
+    }
   }
 
   if (isApi) return json({ error: '找不到這個 API' }, 404);

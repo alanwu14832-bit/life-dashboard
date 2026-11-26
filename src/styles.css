@@ -411,3 +411,48 @@ code { font-family: var(--font-mono); font-size: 0.92em; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* 設定頁 */
+.nav-link { display: inline-flex; align-items: center; text-decoration: none; }
+.nav-link:hover { text-decoration: none; }
+.settings { display: flex; flex-direction: column; gap: 16px; max-width: 880px; }
+.settings-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.settings-head h2 { font-size: 18px; font-weight: 600; }
+.settings-note { margin: 4px 0 0; color: var(--muted); font-size: 13px; max-width: 60ch; }
+.settings-list { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.settings-list > li + li { border-top: 1px solid var(--line); }
+.settings-list > li.is-paused .set-info { opacity: 0.6; }
+.set-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; flex-wrap: wrap; }
+.set-order { display: flex; flex-direction: column; gap: 2px; }
+.icon-btn { width: 28px; height: 22px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); color: var(--muted); cursor: pointer; font-size: 12px; line-height: 1; }
+.icon-btn:disabled { opacity: 0.35; cursor: default; }
+.icon-btn:not(:disabled):hover { color: var(--ink); border-color: var(--muted); }
+.set-info { flex: 1; min-width: 200px; display: flex; flex-direction: column; }
+.set-name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.set-meta { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.set-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.set-confirm { font-size: 13px; color: var(--down); }
+.btn-danger { background: var(--down); color: #fff; }
+.settings-list .pform { border: 0; border-radius: 0; }
+
+.pform { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+.pform h3 { font-size: 15px; font-weight: 600; margin: 0; }
+.pform-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 12px 16px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label { font-size: 13px; font-weight: 500; }
+.field input, .field select {
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  width: 100%;
+}
+.field input:disabled { opacity: 0.6; }
+.field input:focus-visible, .field select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.field-hint { font-size: 12px; color: var(--muted); }
+.pform-check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.pform-check input { width: 16px; height: 16px; accent-color: var(--accent); }
+.pform-actions { display: flex; gap: 8px; }
