@@ -18,6 +18,7 @@ export function App() {
   const load = useCallback(async () => {
     try {
       const res = await fetch('/api/overview');
+      if (res.status === 401) return location.reload(); // 登入過期，重新整理會出現登入頁
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       setData(body as Overview);
@@ -41,6 +42,7 @@ export function App() {
     setRunning(true);
     try {
       const res = await fetch('/api/run', { method: 'POST' });
+      if (res.status === 401) return location.reload();
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       setData(body as Overview);
@@ -76,6 +78,11 @@ export function App() {
           <button type="button" className="btn" onClick={runNow} disabled={running}>
             {running ? '檢查中…' : '立即檢查'}
           </button>
+          <form method="post" action="/logout">
+            <button type="submit" className="btn-quiet">
+              登出
+            </button>
+          </form>
         </div>
       </header>
 

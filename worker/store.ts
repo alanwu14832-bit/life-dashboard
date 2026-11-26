@@ -12,6 +12,8 @@ const SCHEMA = [
    )`,
   `CREATE INDEX IF NOT EXISTS checks_project_kind_ts ON checks (project, kind, ts)`,
   `CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT NOT NULL, ts INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS login_failures (ip TEXT NOT NULL, ts INTEGER NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS login_failures_ip_ts ON login_failures (ip, ts)`,
 ];
 
 const RETENTION_MS = 30 * 86_400_000;

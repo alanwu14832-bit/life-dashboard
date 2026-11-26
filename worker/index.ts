@@ -1,13 +1,30 @@
 import registryJson from '../projects.json';
 import type { DomainInfo, GithubSnapshot, Overview, Registry } from '../shared/types';
+import {
+  clearCookie,
+  clearFailures,
+  COOKIE_NAME,
+  createSession,
+  MAX_FAILURES,
+  MIN_PASSWORD_LENGTH,
+  passwordMatches,
+  readCookie,
+  recentFailures,
+  recordFailure,
+  sameOrigin,
+  sessionCookie,
+  verifySession,
+} from './auth';
 import { checkHttp, checkSupabase, fetchDomain, fetchGithub } from './checks';
 import { deriveHealth, sortByHealth } from './health';
+import { loginPage, setupPage } from './pages';
 import { checkKey, ensureSchema, getKv, insertChecks, setKv, summarize } from './store';
 
 export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
   GITHUB_TOKEN?: string;
+  DASHBOARD_PASSWORD?: string;
 }
 
 const registry = registryJson as Registry;
@@ -87,36 +104,106 @@ export async function buildOverview(env: Env): Promise<Overview> {
   };
 }
 
+const SECURITY_HEADERS: Record<string, string> = {
+  'x-content-type-options': 'nosniff',
+  'x-frame-options': 'DENY',
+  'referrer-policy': 'strict-origin-when-cross-origin',
+  'x-robots-tag': 'noindex, nofollow',
+  'strict-transport-security': 'max-age=63072000; includeSubDomains',
+};
+
+function secure(res: Response): Response {
+  const out = new Response(res.body, res);
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) out.headers.set(k, v);
+  return out;
+}
+
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
     headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
   });
 
+const html = (body: string, status = 200, extra: Record<string, string> = {}) =>
+  new Response(body, {
+    status,
+    headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', ...extra },
+  });
+
+const redirect = (location: string, extra: Record<string, string> = {}) =>
+  new Response(null, { status: 303, headers: { location, 'cache-control': 'no-store', ...extra } });
+
+async function handleLogin(req: Request, env: Env, password: string): Promise<Response> {
+  await ensureSchema(env.DB);
+  const now = Date.now();
+  const ip = req.headers.get('cf-connecting-ip') ?? 'unknown';
+  if ((await recentFailures(env.DB, ip, now)) >= MAX_FAILURES)
+    return html(loginPage('密碼錯太多次，15 分鐘後再試。'), 429);
+
+  const form = await req.formData().catch(() => null);
+  const input = form?.get('password');
+  if (typeof input !== 'string' || !(await passwordMatches(input, password))) {
+    await recordFailure(env.DB, ip, now);
+    return html(loginPage('密碼不對。'), 401);
+  }
+  await clearFailures(env.DB, ip);
+  return redirect('/', { 'set-cookie': sessionCookie(await createSession(password, now)) });
+}
+
+async function route(req: Request, env: Env): Promise<Response> {
+  const url = new URL(req.url);
+  const { pathname } = url;
+  const isApi = pathname.startsWith('/api/');
+
+  // 沒設密碼（或太短）時整站關閉，不會因為忘了設定就公開
+  const password = env.DASHBOARD_PASSWORD;
+  if (!password || password.length < MIN_PASSWORD_LENGTH) {
+    const reason = !password
+      ? '為了保護資料，設定密碼之前網站不會顯示任何內容。'
+      : `目前的密碼太短，至少要 ${MIN_PASSWORD_LENGTH} 個字。`;
+    return isApi ? json({ error: reason }, 503) : html(setupPage(reason), 503);
+  }
+
+  if (req.method === 'POST' && !sameOrigin(req)) return json({ error: '拒絕來自其他網站的請求' }, 403);
+
+  if (pathname === '/login') {
+    if (req.method === 'POST') return handleLogin(req, env, password);
+    return redirect('/');
+  }
+  if (pathname === '/logout' && req.method === 'POST') return redirect('/', { 'set-cookie': clearCookie });
+
+  if (!(await verifySession(password, readCookie(req, COOKIE_NAME), Date.now()))) {
+    if (isApi) return json({ error: '登入已過期，請重新整理頁面' }, 401);
+    return html(loginPage(), 401);
+  }
+
+  if (pathname === '/api/overview' && req.method === 'GET') return json(await buildOverview(env));
+
+  if (pathname === '/api/run' && req.method === 'POST') {
+    await ensureSchema(env.DB);
+    const last = await getKv<{ ts: number }>(env.DB, 'lastRun');
+    if (last && Date.now() - last.v.ts < MIN_MANUAL_GAP_MS)
+      return json({ error: '一分鐘內剛檢查過，稍等一下再按' }, 429);
+    await runChecks(env);
+    return json(await buildOverview(env));
+  }
+
+  if (isApi) return json({ error: '找不到這個 API' }, 404);
+  return env.ASSETS.fetch(req);
+}
+
 export default {
   async fetch(req, env): Promise<Response> {
-    const { pathname } = new URL(req.url);
     try {
-      if (pathname === '/api/overview' && req.method === 'GET') return json(await buildOverview(env));
-
-      if (pathname === '/api/run' && req.method === 'POST') {
-        await ensureSchema(env.DB);
-        const last = await getKv<{ ts: number }>(env.DB, 'lastRun');
-        if (last && Date.now() - last.v.ts < MIN_MANUAL_GAP_MS)
-          return json({ error: '一分鐘內剛檢查過，稍等一下再按' }, 429);
-        await runChecks(env);
-        return json(await buildOverview(env));
-      }
-
-      if (pathname.startsWith('/api/')) return json({ error: '找不到這個 API' }, 404);
+      return secure(await route(req, env));
     } catch (err) {
       console.error(err);
-      return json({ error: err instanceof Error ? err.message : String(err) }, 500);
+      return secure(json({ error: err instanceof Error ? err.message : String(err) }, 500));
     }
-    return env.ASSETS.fetch(req);
   },
 
   async scheduled(_event, env, ctx): Promise<void> {
     ctx.waitUntil(runChecks(env));
   },
 } satisfies ExportedHandler<Env>;
+

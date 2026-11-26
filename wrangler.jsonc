@@ -8,7 +8,8 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    // 所有請求都先經過 Worker 檢查登入，沒登入拿不到任何檔案
+    "run_worker_first": true
   },
   "d1_databases": [
     {

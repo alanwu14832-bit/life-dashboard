@@ -10,7 +10,7 @@
 | 主機 | 一個 Cloudflare Worker，同時負責網頁、`/api/*` 和排程 |
 | 排程 | Cron 每 30 分鐘跑一輪檢查（`wrangler.jsonc` 的 `triggers`） |
 | 資料 | Cloudflare D1（SQLite），保留 30 天；第一次用到時自動建表 |
-| 登入 | Cloudflare Access，只允許自己的 Gmail |
+| 登入 | 一組密碼（Secret `DASHBOARD_PASSWORD`），登入後 30 天內免輸入；沒設密碼時整站不開放 |
 | 專案清單 | `projects.json` |
 
 檢查內容：
@@ -47,8 +47,15 @@
 2. **連 GitHub 自動部署**：Workers & Pages → Create → Import a repository → 選這個 repo。
    - Build command：`npm run build`
    - Deploy command：`npx wrangler deploy`
-3. **鎖起來**：部署好之後，到這個 Worker 的 Settings → Domains & Routes，在 `workers.dev` 那列開啟 Cloudflare Access，政策設成只允許自己的 Gmail。
+3. **設定登入密碼**：Worker 的 Settings → Variables and Secrets → Add，類型選 Secret，名稱 `DASHBOARD_PASSWORD`，至少 12 個字。沒設之前網站只會顯示設定說明，不會露出任何資料。
 4. **GitHub 權杖**：GitHub → Settings → Developer settings → Fine-grained tokens，Repository access 選 All repositories，權限全部唯讀：Contents、Metadata、Pull requests、Commit statuses、Deployments、Actions。到 Worker 的 Settings → Variables and Secrets 新增 Secret `GITHUB_TOKEN`。
+
+## 登入機制
+
+- 密碼存在 Cloudflare Secret，不在程式碼裡。登入後發一個簽章過的 cookie（HttpOnly、Secure、SameSite=Lax），30 天有效。
+- 改密碼會讓所有裝置一起登出（簽章金鑰由密碼推導）。
+- 同一個 IP 15 分鐘內錯 10 次就暫時鎖住。
+- 所有請求（包括網頁檔案）都要先登入，排程檢查不受影響。
 
 ## 本機開發
 
@@ -58,7 +65,7 @@ npm test            # 單元測試
 npm run preview     # 建置後用 wrangler dev 起在 http://localhost:8787（本機 D1）
 ```
 
-本機要讀 GitHub 資料的話，把 `.dev.vars.example` 複製成 `.dev.vars` 填入權杖（這個檔不會進 git）。
+本機要先把 `.dev.vars.example` 複製成 `.dev.vars`，填入測試用的密碼（和 GitHub 權杖，可省略）。這個檔不會進 git。
 
 改前端時可以開兩個終端：一個 `npx wrangler dev`，一個 `npm run dev`（Vite 會把 `/api` 轉給 8787）。
 
